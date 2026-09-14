@@ -62,15 +62,15 @@ export interface ModsFolderCandidate {
 
 export const SOURCES: Record<string, { id: string; label: string }> = {
   worldofmods: { id: "worldofmods", label: "WorldOfMods" },
-  beamng: { id: "beamng", label: "Репозиторий BeamNG" },
+  beamngweb: { id: "beamngweb", label: "Официальный сайт BeamNG" },
+  beamng: { id: "beamng", label: "Репозиторий BeamNG (токен)" },
 };
 
 /** Имя zip-файла, который будет создан при установке этого мода, по его ключу. */
 export function installedFileName(item: ModItem): string {
-  const last = item.key.split("/").pop() ?? "";
-  if (item.source === "worldofmods") {
-    return last.replace(/\.html$/, "") + ".zip";
-  }
+  const last = item.key.split("/").filter(Boolean).pop() ?? "";
+  if (item.source === "worldofmods") return last.replace(/\.html$/, "") + ".zip";
+  if (item.source === "beamngweb") return last + ".zip";
   return last;
 }
 

@@ -141,6 +141,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
           <p className="hint">
             Официальный репозиторий требует авторизацию. Токен можно получить в самом
             BeamNG.drive при входе в аккаунт — игра использует его для доступа к repo API.
+            Вкладка «Официальный сайт BeamNG» работает без токена.
           </p>
           <div className="manual-row">
             <input

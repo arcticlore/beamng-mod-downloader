@@ -7,11 +7,12 @@ import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
 import { installedFileName, type DownloadState, type InstalledMod, type ModItem } from "./types";
 
-type Tab = "worldofmods" | "beamng" | "installed";
+type Tab = "worldofmods" | "beamngweb" | "beamng" | "installed";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "worldofmods", label: "WorldOfMods" },
-  { id: "beamng", label: "Репозиторий BeamNG" },
+  { id: "beamngweb", label: "Официальный сайт" },
+  { id: "beamng", label: "Репозиторий (токен)" },
   { id: "installed", label: "Установленные" },
 ];
 
