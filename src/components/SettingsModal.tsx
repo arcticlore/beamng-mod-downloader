@@ -3,6 +3,7 @@ import {
   detectModsFolders,
   getModsFolder,
   getRepoToken,
+  openExternal,
   setModsFolder,
   setModsFolderForce,
   setRepoToken,
@@ -139,11 +140,30 @@ export function SettingsModal({ onClose, onChanged }: Props) {
         <section>
           <h3>Репозиторий BeamNG (токен аккаунта)</h3>
           <p className="hint">
-            Официальный репозиторий требует авторизацию. Токен можно получить в самом
-            BeamNG.drive при входе в аккаунт — игра использует его для доступа к repo API.
-            Вкладки «Официальный сайт BeamNG» и «GitHub-релизы» работают без токена.
+            Официальный репозиторий BeamNG требует токен, который генерирует сама
+            игра при входе в аккаунт beamng.com — отдельного сайта для его
+            получения нет. Если вы уже входили, скопируйте токен сюда.
           </p>
-          <div className="manual-row">
+          <ol className="hint" style={{ margin: "6px 0 10px 18px" }}>
+            <li>Запустите BeamNG.drive и войдите в аккаунт beamng.com.</li>
+            <li>Откройте в игре «Репозиторий» — токен появится в разделе репозитория.</li>
+            <li>Скопируйте токен и вставьте поле ниже.</li>
+          </ol>
+          <div className="manual-row" style={{ gap: 8 }}>
+            <button
+              className="btn"
+              onClick={() => openExternal("https://www.beamng.com/threads/mod-repository-api.106862/")}
+            >
+              Инструкция BeamNG
+            </button>
+            <button
+              className="btn"
+              onClick={() => openExternal("https://www.beamng.com/login/")}
+            >
+              Войти на beamng.com
+            </button>
+          </div>
+          <div className="manual-row" style={{ marginTop: 8 }}>
             <input
               className="search-input"
               placeholder="Токен BeamNG"

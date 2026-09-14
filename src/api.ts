@@ -22,6 +22,8 @@ export const getRepoToken = () => invoke<string | null>("get_repo_token");
 
 export const setRepoToken = (token: string) => invoke<void>("set_repo_token", { token });
 
+export const openExternal = (url: string) => invoke<void>("open_url", { url });
+
 export const searchMods = (
   source: string,
   query: string | null,

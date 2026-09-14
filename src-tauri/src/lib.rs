@@ -12,14 +12,22 @@ use models::{
     DownloadState, InstallRequest, InstalledMod, ModDetail, ModSearchResult, ModsFolderCandidate,
     SourceCategory,
 };
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::{Manager, State};
+
+/// Сколько времени держим ответы поиска в памяти, чтобы возврат на страницу
+/// / переключение категорий не били по сети повторно.
+const SEARCH_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(20);
 
 pub struct AppState {
     pub client: reqwest::Client,
     pub config: Mutex<Config>,
     pub downloads: download::DownloadTable,
+    pub listing_cache: Arc<Mutex<HashMap<String, (Instant, ModSearchResult)>>>,
 }
 
 impl AppState {
@@ -84,6 +92,33 @@ fn set_repo_token(state: State<'_, AppState>, token: String) -> Result<(), Strin
     cfg.save().map_err(|e| e.to_string())
 }
 
+/// Открывает ссылку в системном браузере (автоматический переход на нужную
+/// страницу: вход в beamng.com, документация и т.п.).
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("разрешены только http/https ссылки".to_string());
+    }
+    #[cfg(target_os = "linux")]
+    let opened = std::process::Command::new("xdg-open")
+        .arg(&url)
+        .spawn()
+        .is_ok();
+    #[cfg(target_os = "macos")]
+    let opened = std::process::Command::new("open").arg(&url).spawn().is_ok();
+    #[cfg(target_os = "windows")]
+    let opened = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &url])
+        .spawn()
+        .is_ok();
+
+    if opened {
+        Ok(())
+    } else {
+        Err("не удалось открыть браузер".to_string())
+    }
+}
+
 #[tauri::command]
 async fn search_mods(
     state: State<'_, AppState>,
@@ -93,7 +128,28 @@ async fn search_mods(
     page: u32,
 ) -> Result<ModSearchResult, String> {
     let token = state.repo_token();
-    sources::search(
+    // токен участвует в ключе кэша, чтобы смена токена не подсовывала старые
+    // результаты для источника BeamNG
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    if let Some(t) = &token {
+        t.hash(&mut hasher);
+    }
+    let key = format!(
+        "{source}|{}|{}|{page}|{}",
+        query.as_deref().unwrap_or(""),
+        category.as_deref().unwrap_or(""),
+        hasher.finish()
+    );
+
+    if let Ok(cache) = state.listing_cache.lock() {
+        if let Some((at, res)) = cache.get(&key) {
+            if at.elapsed() < SEARCH_CACHE_TTL {
+                return Ok(res.clone());
+            }
+        }
+    }
+
+    let result = sources::search(
         &state.client,
         &source,
         query.as_deref(),
@@ -102,7 +158,12 @@ async fn search_mods(
         token.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    if let Ok(mut cache) = state.listing_cache.lock() {
+        cache.insert(key, (Instant::now(), result.clone()));
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -187,7 +248,8 @@ pub fn run() {
             let state = AppState {
                 client,
                 config: Mutex::new(Config::load()),
-                downloads: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+                downloads: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+                listing_cache: Arc::new(Mutex::new(HashMap::new())),
             };
             app.manage(state);
             Ok(())
@@ -199,6 +261,7 @@ pub fn run() {
             set_mods_folder_force,
             get_repo_token,
             set_repo_token,
+            open_url,
             search_mods,
             get_mod_detail,
             get_categories,
