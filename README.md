@@ -47,6 +47,8 @@ npx tauri dev          # запуск в dev-режиме
 npx tauri build        # сборка релиза (AppImage/.deb/.rpm и т.п.)
 ```
 
+Релизные сборки также автоматически собираются в GitHub Actions на каждый пуш в `main` (артефакты в Actions → build → Artifacts: AppImage/.deb/.rpm).
+
 Тесты Rust:
 
 ```bash

@@ -54,7 +54,7 @@ fn listing_url(category: &str, page: u32) -> String {
 fn mod_id_from_url(href: &str) -> Option<String> {
     let stem = href.rsplit('/').next()?;
     let id = stem
-        .split(|c: char| c == '-')
+        .split('-')
         .next()
         .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))?
         .to_string();
@@ -79,8 +79,7 @@ fn first_img_src(article: &scraper::element_ref::ElementRef) -> Option<String> {
     article
         .select(&sel_img)
         .filter_map(|img| img.value().attr("src"))
-        .filter(|src| !src.contains("loading-wide"))
-        .next()
+        .find(|src| !src.contains("loading-wide"))
         .map(ToOwned::to_owned)
 }
 
@@ -413,5 +412,27 @@ mod tests {
         assert_eq!(cats[0].id, "all");
         assert_eq!(cats[0].label, "Все моды");
         assert!(cats.iter().any(|c| c.id == "planes"));
+    }
+
+    /// Сквозная проверка живой сети: листинг -> деталь -> прямая ссылка.
+    #[tokio::test]
+    #[ignore]
+    async fn network_listing_detail_and_resolve() {
+        let client = crate::http::build_client().expect("http client");
+        let list = search(&client, None, Some("cars"), 1)
+            .await
+            .expect("listing");
+        assert!(!list.items.is_empty(), "листинг WorldOfMods пуст");
+        assert!(list.total_pages >= 1);
+
+        let item = &list.items[0];
+        assert!(item.id.starts_with("worldofmods:"), "id: {}", item.id);
+
+        let d = detail(&client, &item.id, &item.key).await.expect("detail");
+        assert!(!d.item.name.is_empty());
+
+        let (url, filename) = resolve_download(&client, &item.key).await.expect("resolve");
+        assert!(url.starts_with("https://"));
+        assert!(filename.ends_with(".zip"));
     }
 }

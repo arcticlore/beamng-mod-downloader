@@ -30,6 +30,15 @@ pub struct ActiveDownload {
     pub error: Option<String>,
 }
 
+struct DownloadJob<'a> {
+    url: &'a str,
+    part_path: PathBuf,
+    final_path: PathBuf,
+    key: &'a str,
+    source: &'a str,
+    repo_token: Option<&'a str>,
+}
+
 impl ActiveDownload {
     fn to_state(&self) -> DownloadState {
         DownloadState {
@@ -127,22 +136,19 @@ pub async fn start(
     let task_key = key.clone();
     let app = app.clone();
     let client = client.clone();
-    let table = Arc::clone(&table);
+    let table = table.clone();
     let part_path = mods_dir.join(format!(".{filename}.part"));
 
     tokio::spawn(async move {
-        let result = run_download(
-            &app,
-            &client,
-            &table,
-            &url,
-            &part_path,
-            &final_path,
-            &task_key,
-            &req.source,
-            repo_token.as_deref(),
-        )
-        .await;
+        let job = DownloadJob {
+            url: &url,
+            part_path,
+            final_path,
+            key: &task_key,
+            source: &req.source,
+            repo_token: repo_token.as_deref(),
+        };
+        let result = run_download(&app, &client, &table, &job).await;
 
         let mut map = table.lock().await;
         let entry = map.get_mut(&task_key);
@@ -187,19 +193,14 @@ async fn run_download(
     app: &tauri::AppHandle,
     client: &reqwest::Client,
     table: &DownloadTable,
-    url: &str,
-    part_path: &std::path::Path,
-    final_path: &std::path::Path,
-    key: &str,
-    source: &str,
-    repo_token: Option<&str>,
+    job: &DownloadJob<'_>,
 ) -> Result<()> {
-    let mut req = client.get(url);
-    if source == "worldofmods" {
+    let mut req = client.get(job.url);
+    if job.source == "worldofmods" {
         req = req.header(reqwest::header::REFERER, "https://www.worldofmods.com/");
     }
-    if source == "beamng" {
-        if let Some(token) = repo_token {
+    if job.source == "beamng" {
+        if let Some(token) = job.repo_token {
             req = req.header("Authorization", format!("Bearer {token}"));
         }
     }
@@ -218,9 +219,9 @@ async fn run_download(
 
     let total = response.content_length();
     let mut stream = response.bytes_stream();
-    let mut file = tokio::fs::File::create(part_path)
+    let mut file = tokio::fs::File::create(&job.part_path)
         .await
-        .with_context(|| format!("не удалось создать {}", part_path.display()))?;
+        .with_context(|| format!("не удалось создать {}", job.part_path.display()))?;
 
     let mut received: u64 = 0;
     let mut window_start = Instant::now();
@@ -244,7 +245,7 @@ async fn run_download(
 
         {
             let mut map = table.lock().await;
-            if let Some(dl) = map.get_mut(key) {
+            if let Some(dl) = map.get_mut(job.key) {
                 dl.received = received;
                 dl.total = total;
                 dl.speed_bps = speed;
@@ -253,7 +254,7 @@ async fn run_download(
         emit_progress(
             app,
             table,
-            key,
+            job.key,
             std::time::Duration::from_millis(150),
             &mut last_emit,
         );
@@ -263,13 +264,18 @@ async fn run_download(
     drop(file);
 
     if received == 0 {
-        let _ = tokio::fs::remove_file(part_path).await;
+        let _ = tokio::fs::remove_file(&job.part_path).await;
         return Err(anyhow!("файл пуст — похоже, ссылка устарела"));
     }
 
-    tokio::fs::rename(part_path, final_path)
+    tokio::fs::rename(&job.part_path, &job.final_path)
         .await
-        .with_context(|| format!("не удалось переместить архив в {}", final_path.display()))?;
+        .with_context(|| {
+            format!(
+                "не удалось переместить архив в {}",
+                job.final_path.display()
+            )
+        })?;
 
     Ok(())
 }
