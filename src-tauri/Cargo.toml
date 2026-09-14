@@ -1,0 +1,27 @@
+[package]
+name = "bimka-mod-installer"
+version = "0.1.0"
+description = "Кроссплатформенный установщик модов для BeamNG.drive"
+edition = "2021"
+
+[lib]
+name = "bimka_mod_installer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "gzip", "brotli", "deflate", "rustls-tls", "charset", "http2"] }
+tokio = { version = "1", features = ["fs", "io-util", "time", "macros", "rt-multi-thread"] }
+scraper = "0.22"
+futures-util = "0.3"
+dirs = "6"
+glob = "0.3"
+anyhow = "1"
+thiserror = "2"
+percent-encoding = "2"
+base64 = "0.22"

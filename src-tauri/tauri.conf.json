@@ -1,0 +1,41 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Bimka Mod Installer",
+  "version": "0.1.0",
+  "identifier": "com.bimka.modinstaller",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Bimka Mod Installer",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 940,
+        "minHeight": 620,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Кроссплатформенный установщик модов для BeamNG.drive",
+    "longDescription": "Поиск папок модов BeamNG.drive, загрузка модов из нескольких источников с прогрессом, просмотр имён, аватаров и описаний.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
