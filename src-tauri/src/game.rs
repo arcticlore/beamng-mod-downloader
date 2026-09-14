@@ -13,9 +13,18 @@ fn root_candidates() -> Vec<PathBuf> {
         if let Some(h) = &home {
             roots.push(h.join(".local/share/BeamNG/BeamNG.drive"));
             roots.push(h.join(".local/share/BeamNG.drive"));
+            roots.push(h.join("BeamNG.drive"));
             roots.push(h.join(".var/app/com.beamng/BeamNG.drive"));
             roots.push(h.join(".steam/steam/steamapps/common/BeamNG.drive"));
             roots.push(h.join("Steam/steamapps/common/BeamNG.drive"));
+            // Proton-префиксы (AppID 284160): игра под Windows в Wine-окружении,
+            // каталог пользователя лежит глубоко в pfx.
+            for steam_root in [".local/share/Steam", ".steam/steam"] {
+                roots.push(h.join(
+                    format!("{steam_root}/steamapps/compatdata/284160/pfx/drive_c/")
+                        + "users/steamuser/AppData/Local/BeamNG.drive",
+                ));
+            }
         }
         if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
             if !xdg.is_empty() {
@@ -54,10 +63,6 @@ fn root_candidates() -> Vec<PathBuf> {
             roots.push(h.join("Library/Application Support/Steam/steamapps/common/BeamNG.drive"));
         }
     }
-
-    roots.push(PathBuf::from(
-        "/home/samsa/.local/share/BeamNG/BeamNG.drive",
-    ));
 
     roots
 }
@@ -196,5 +201,49 @@ mod tests {
         assert!(found.iter().any(|p| p.to_string_lossy().contains("0.33")));
         assert!(found.iter().any(|p| p.to_string_lossy().contains("v0.34")));
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn root_candidates_include_home_and_proton() {
+        let fake_home = temp_dir();
+        std::fs::create_dir_all(&fake_home).ok();
+        let old_home = std::env::var("HOME").ok();
+        let old_xdg = std::env::var("XDG_DATA_HOME").ok();
+        std::env::set_var("HOME", &fake_home);
+        std::env::remove_var("XDG_DATA_HOME");
+
+        let roots = root_candidates();
+        let roots: Vec<String> = roots.iter().map(|p| p.display().to_string()).collect();
+
+        std::env::remove_var("HOME");
+        if let Some(old) = old_home {
+            std::env::set_var("HOME", old);
+        }
+        if let Some(old) = old_xdg {
+            std::env::set_var("XDG_DATA_HOME", old);
+        }
+
+        let home = fake_home.display().to_string();
+        assert!(
+            roots.contains(&format!("{home}/.local/share/BeamNG/BeamNG.drive")),
+            "roots: {roots:?}"
+        );
+        assert!(
+            roots.contains(&format!("{home}/BeamNG.drive")),
+            "roots: {roots:?}"
+        );
+        let proton = format!("{home}/.local/share/Steam/steamapps/compatdata/284160/pfx/")
+            + "drive_c/users/steamuser/AppData/Local/BeamNG.drive";
+        assert!(roots.contains(&proton), "roots: {roots:?}");
+        let proton_alt = format!("{home}/.steam/steam/steamapps/compatdata/284160/pfx/")
+            + "drive_c/users/steamuser/AppData/Local/BeamNG.drive";
+        assert!(roots.contains(&proton_alt), "roots: {roots:?}");
+        // никаких хардкод-путей чужой машины
+        assert!(
+            roots.iter().all(|p| !p.contains("/home/samsa")),
+            "roots: {roots:?}"
+        );
+        std::fs::remove_dir_all(&fake_home).ok();
     }
 }

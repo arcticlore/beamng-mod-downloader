@@ -103,7 +103,6 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
     let sel_cat = Selector::parse(".resourceDetails a[href*=\"/categories/\"]").unwrap();
     let sel_datetime = Selector::parse(".resourceDetails .DateTime").unwrap();
     let sel_tagline = Selector::parse(".tagLine").unwrap();
-    let sel_version = Selector::parse("span.version").unwrap();
 
     let mut items = Vec::new();
     for li in doc.select(&sel_item) {
@@ -156,10 +155,6 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
                     .join(" ")
             })
             .filter(|t| !t.is_empty());
-        let version = li
-            .select(&sel_version)
-            .next()
-            .map(|s| s.text().collect::<Vec<_>>().join("").trim().to_string());
 
         items.push(ModItem {
             id: format!("beamngweb:{id}"),
@@ -171,7 +166,7 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
             category: cat_name,
             author,
             published,
-            downloads: version,
+            downloads: None,
             size_bytes: None,
         });
     }
@@ -191,7 +186,14 @@ pub async fn search(
 ) -> Result<ModSearchResult, SourceError> {
     let url = listing_url(category.unwrap_or("all"), page);
     let html = http::fetch_string(client, &url, None).await?;
-    let result = parse_listing(&html, page)?;
+    let mut result = parse_listing(&html, page)?;
+    // pageNavHeader показывает *глобальное* число страниц ресурсов, а не
+    // категории — для категорий страниц может быть тысячи и они врут.
+    if category != Some("all") {
+        // неполная страница = категория закончилась
+        let is_last = result.items.len() < 100;
+        result.total_pages = if is_last { page.max(1) } else { page + 1 };
+    }
     if result.items.is_empty() && page > 1 {
         // категория могла закончиться раньше
         return Ok(ModSearchResult {
@@ -437,7 +439,7 @@ mod tests {
         assert_eq!(it.author.as_deref(), Some("LJ74"));
         assert_eq!(it.published.as_deref(), Some("Nov 7, 2023 at 10:07 AM"));
         assert_eq!(it.category.as_deref(), Some("Land"));
-        assert_eq!(it.downloads.as_deref(), Some("1.4"));
+        assert_eq!(it.downloads, None);
         assert_eq!(
             it.thumbnail.as_deref(),
             Some("https://www.beamng.com/data/resource_icons/28/28903.jpg?t")

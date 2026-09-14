@@ -5,9 +5,10 @@
 Возможности:
 
 - автообнаружение папок модов (Linux / Windows / macOS), ручной выбор любой папки;
-- три источника модов:
+- четыре источника модов:
   - **WorldOfMods** — без авторизации, категории «Все / Авто / Карты / Мото / Авиа», пагинация;
   - **Официальный сайт BeamNG** — без токена; категории: Авто, Карты и террейны, Сценарии, Автоматизация, Ландшафт, Скины, Звуки, UI и приложения, Track Builder, Номерные знаки, Моды модов; скачивание идёт напрямую через beamng.com;
+  - **GitHub-релизы (без токена)** — поиск по `topic:beamng` через GitHub Search API, скачивание `.zip` из последнего релиза напрямую с `objects.githubusercontent.com`; не требует авторизации (кэширование ответов API в памяти);
   - **Репозиторий BeamNG (токен)** — поиск и детали через `api.beamng.com` (требуется токен аккаунта, вводится в настройках); вкладка подходит для тех, кто уже имеет доступ к API;
 - карточки модов: имя, автор, аватарка, описание, счётчик скачиваний, размер;
 - скачивание с прогрессом (текущая скорость, байты), установка прямо в папку модов (папку `mods` текущей версии);
@@ -26,7 +27,7 @@ src-tauri/src/game.rs       поиск папок модов
 src-tauri/src/http.rs       HTTP-клиент и утилиты
 src-tauri/src/download.rs   менеджер загрузок с прогрессом
 src-tauri/src/installer.rs  список/удаление установленных модов
-src-tauri/src/sources/      worldofmods.rs, beamngweb.rs, beamng.rs (+ mod.rs, SourceError)
+src-tauri/src/sources/      worldofmods.rs, beamngweb.rs, github.rs, beamng.rs (+ mod.rs, SourceError)
 ```
 
 ## Сборка
@@ -59,7 +60,7 @@ cargo test
 
 ## Токен BeamNG
 
-Токен нужен только для вкладки «Репозиторий BeamNG (токен)»: выдаётся на сайте BeamNG (`https://www.beamng.com/account/upgrades/`) и отправляется как `Authorization: Bearer <token>`. Вкладки WorldOfMods и «Официальный сайт BeamNG» работают без токена.
+Токен нужен только для вкладки «Репозиторий BeamNG (токен)»: выдаётся на сайте BeamNG (`https://www.beamng.com/account/upgrades/`) и отправляется как `Authorization: Bearer <token>`. Вкладки WorldOfMods, «Официальный сайт BeamNG» и «GitHub-релизы» работают без токена.
 
 ## Конфиг
 

@@ -1,5 +1,6 @@
 pub mod beamng;
 pub mod beamngweb;
+pub mod github;
 pub mod worldofmods;
 
 use crate::models::{ModDetail, ModSearchResult, SourceCategory};
@@ -36,6 +37,7 @@ pub async fn search(
         "worldofmods" => worldofmods::search(client, query, category, page).await,
         "beamng" => beamng::search(client, query, category, page, repo_token).await,
         "beamngweb" => beamngweb::search(client, query, category, page).await,
+        "github" => github::search(client, query, category, page).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),
@@ -53,6 +55,7 @@ pub async fn detail(
         "worldofmods" => worldofmods::detail(client, mod_id, key).await,
         "beamng" => beamng::detail(client, mod_id, key, repo_token).await,
         "beamngweb" => beamngweb::detail(client, mod_id, key).await,
+        "github" => github::detail(client, mod_id, key).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),
@@ -70,6 +73,7 @@ pub async fn resolve_download(
         "worldofmods" => worldofmods::resolve_download(client, key).await,
         "beamng" => beamng::resolve_download(client, key, repo_token).await,
         "beamngweb" => beamngweb::resolve_download(client, key, repo_token).await,
+        "github" => github::resolve_download(client, key, repo_token).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),
@@ -81,10 +85,11 @@ pub fn categories(source: &str) -> Vec<SourceCategory> {
         "worldofmods" => worldofmods::categories(),
         "beamng" => beamng::categories(),
         "beamngweb" => beamngweb::categories(),
+        "github" => github::categories(),
         _ => Vec::new(),
     }
 }
 
 pub fn validate_source(source: &str) -> bool {
-    matches!(source, "worldofmods" | "beamng" | "beamngweb")
+    matches!(source, "worldofmods" | "beamng" | "beamngweb" | "github")
 }
