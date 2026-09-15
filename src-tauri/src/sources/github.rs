@@ -1,5 +1,7 @@
+use crate::http;
 use crate::models::{ModDetail, ModItem, ModSearchResult, SourceCategory};
 use crate::sources::SourceError;
+use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
@@ -229,16 +231,56 @@ fn cache_release(owner_repo: &str, url: &str) {
     }
 }
 
-#[derive(Deserialize, Debug)]
-struct ReleaseLatest {
-    #[serde(default)]
-    assets: Vec<ReleaseAsset>,
+fn gh_abs(href: &str) -> String {
+    if href.starts_with("//") {
+        format!("https:{href}")
+    } else if href.starts_with("http://") || href.starts_with("https://") {
+        href.to_string()
+    } else {
+        format!("https://github.com{href}")
+    }
 }
 
-#[derive(Deserialize, Debug)]
-struct ReleaseAsset {
-    name: String,
-    browser_download_url: String,
+/// Извлекает первый корректный тег релиза из страницы `releases/latest`
+/// (на странице встречаются и служебные ссылки вида `releases/tag/*name`,
+/// которые пропускаются).
+fn extract_tag(html: &str) -> Option<String> {
+    let marker = "/releases/tag/";
+    let mut probe = html;
+    loop {
+        let start = probe.find(marker)? + marker.len();
+        let rest = &probe[start..];
+        let end = rest
+            .find(|c: char| !c.is_ascii_alphanumeric() && !matches!(c, '.' | '-' | '_'))
+            .unwrap_or(rest.len());
+        let tag = &rest[..end];
+        if !tag.is_empty() {
+            return Some(tag.to_string());
+        }
+        probe = rest;
+    }
+}
+
+/// Выбирает архив для скачивания из HTML-страницы assets.
+/// Предпочтение — `.zip`; fallback — первый попавшийся файл.
+fn pick_asset(html: &str) -> Option<String> {
+    let doc = Html::parse_document(html);
+    let sel = Selector::parse("a[href*=\"releases/download/\"]").ok()?;
+    let mut fallback = None;
+    for a in doc.select(&sel) {
+        let href = a.value().attr("href").unwrap_or("");
+        if href.is_empty() {
+            continue;
+        }
+        let filename = href.rsplit('/').next().unwrap_or("");
+        if filename.to_ascii_lowercase().ends_with(".zip") {
+            return Some(gh_abs(href));
+        }
+        if fallback.is_none() {
+            fallback = Some(gh_abs(href));
+        }
+    }
+    fallback
 }
 
 /// Возвращает (url последнего релиза, имя локального файла).
@@ -254,20 +296,31 @@ pub async fn resolve_download(
         return Ok((url, format!("{full}.zip")));
     }
 
-    let url = format!("{API}/repos/{full}/releases/latest");
-    let body = gh_get(client, &url).await?;
-    let rel: ReleaseLatest = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitHub ответил не JSON: {e}")))?;
+    let base = format!("https://github.com/{full}");
+    let latest_url = format!("{base}/releases/latest");
+    let latest = http::fetch_string(client, &latest_url, None)
+        .await
+        .map_err(|e| SourceError::Unavailable(format!("нет релизов у {full}: {e}")))?;
 
-    let asset = rel
-        .assets
-        .iter()
-        .find(|a| a.name.to_ascii_lowercase().ends_with(".zip"))
-        .or_else(|| rel.assets.first())
-        .ok_or_else(|| SourceError::Unavailable(format!("в последнем релизе {full} нет файлов")))?;
+    let mut url = pick_asset(&latest);
+    if url.is_none() {
+        if let Some(tag) = extract_tag(&latest) {
+            let expanded_url = format!("{base}/releases/expanded_assets/{tag}");
+            let expanded = http::fetch_string(client, &expanded_url, Some(&latest_url))
+                .await
+                .map_err(|e| SourceError::Network(e.to_string()))?;
+            url = pick_asset(&expanded);
+        }
+    }
 
-    cache_release(&full, &asset.browser_download_url);
-    Ok((asset.browser_download_url.clone(), format!("{full}.zip")))
+    let url = url.ok_or_else(|| {
+        SourceError::Unavailable(format!(
+            "в последнем релизе {full} нет файлов для скачивания"
+        ))
+    })?;
+
+    cache_release(&full, &url);
+    Ok((url, format!("{full}.zip")))
 }
 
 #[cfg(test)]
@@ -334,6 +387,49 @@ mod tests {
         assert_eq!(sanitize_query("-car"), "car");
         assert_eq!(sanitize_query("a: /\\ ?"), "a");
         assert_eq!(sanitize_query(""), "");
+    }
+
+    #[test]
+    fn extract_tag_finds_latest() {
+        let html = r#"href="/A/B/releases/tag/v4.22.4""#;
+        assert_eq!(extract_tag(html).as_deref(), Some("v4.22.4"));
+        assert!(extract_tag("no releases here").is_none());
+    }
+
+    #[test]
+    fn extract_tag_skips_placeholder_link() {
+        let html = r#"
+            <a href="/A/B/releases/tag/*name">rename</a>
+            <a href="/A/B/releases/tag/v1.0.0">latest</a>
+        "#;
+        assert_eq!(extract_tag(html).as_deref(), Some("v1.0.0"));
+    }
+
+    #[test]
+    fn pick_asset_prefers_zip() {
+        let html = r#"
+            <a href="/A/B/releases/download/v1/B.zip">B.zip</a>
+            <a href="/A/B/releases/download/v1/B.zip.sha256">B.zip.sha256</a>
+            <a href="/A/B/releases/download/v1/B.tar.gz">B.tar.gz</a>
+        "#;
+        assert_eq!(
+            pick_asset(html).as_deref(),
+            Some("https://github.com/A/B/releases/download/v1/B.zip")
+        );
+    }
+
+    #[test]
+    fn pick_asset_fallback_without_zip() {
+        let html = r#"<a href="/A/B/releases/download/v1/file.exe">exe</a>"#;
+        assert_eq!(
+            pick_asset(html).as_deref(),
+            Some("https://github.com/A/B/releases/download/v1/file.exe")
+        );
+    }
+
+    #[test]
+    fn pick_asset_empty_when_no_assets() {
+        assert!(pick_asset("<p>no assets</p>").is_none());
     }
 
     #[test]
