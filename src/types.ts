@@ -60,10 +60,41 @@ export interface ModsFolderCandidate {
   exists: boolean;
 }
 
+export interface AppSettings {
+  theme?: string | null;
+  accent?: string | null;
+  installedSort?: string | null;
+  installedCollapsed?: boolean | null;
+  cardSize?: string | null;
+}
+
+export interface CustomRepo {
+  full: string;
+  label: string | null;
+}
+
+export const THEMES = [
+  { id: "dark", label: "Тёмная" },
+  { id: "light", label: "Светлая" },
+];
+
+export const CARD_SIZES = [
+  { id: "compact", label: "Компактные" },
+  { id: "normal", label: "Обычные" },
+  { id: "large", label: "Крупные" },
+];
+
+export const INSTALLED_SORTS = [
+  { id: "date", label: "По дате изменения" },
+  { id: "name", label: "По имени" },
+  { id: "size", label: "По размеру" },
+];
+
 export const SOURCES: Record<string, { id: string; label: string }> = {
   worldofmods: { id: "worldofmods", label: "WorldOfMods" },
   beamngweb: { id: "beamngweb", label: "Официальный сайт BeamNG" },
   github: { id: "github", label: "GitHub-релизы (без токена)" },
+  custom: { id: "custom", label: "Свои источники" },
   beamng: { id: "beamng", label: "Репозиторий BeamNG (токен)" },
 };
 
@@ -73,7 +104,7 @@ export function installedFileName(item: ModItem): string {
   const last = parts.pop() ?? "";
   if (item.source === "worldofmods") return last.replace(/\.html$/, "") + ".zip";
   if (item.source === "beamngweb") return last + ".zip";
-  if (item.source === "github") {
+  if (item.source === "github" || item.source === "custom") {
     const owner = parts.pop() ?? "";
     return `${owner}-${last}.zip`;
   }

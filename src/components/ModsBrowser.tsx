@@ -8,9 +8,10 @@ interface Props {
   downloads: Record<string, DownloadState>;
   installedNames: Set<string>;
   tokenWarning: boolean;
+  cardSize: string;
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
-  onTokenRequest: () => void;
+  onOpenSettings: () => void;
 }
 
 export function ModsBrowser({
@@ -18,9 +19,10 @@ export function ModsBrowser({
   downloads,
   installedNames,
   tokenWarning,
+  cardSize,
   onInstall,
   onInfo,
-  onTokenRequest,
+  onOpenSettings,
 }: Props) {
   const [items, setItems] = useState<ModItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -101,7 +103,7 @@ export function ModsBrowser({
       {tokenWarning && source === "beamng" && (
         <div className="banner banner-warn">
           Для репозитория BeamNG нужен токен авторизации.
-          <button className="btn btn-sm" onClick={onTokenRequest}>
+          <button className="btn btn-sm" onClick={onOpenSettings}>
             Задать токен в настройках
           </button>
         </div>
@@ -111,11 +113,24 @@ export function ModsBrowser({
 
       {loading && <div className="browser-loading">Загрузка…</div>}
 
-      {!loading && visible.length === 0 && !error && (
+      {!loading && visible.length === 0 && !error && source === "custom" && (
+        <div className="browser-empty">
+          <p>Свои источники пока пусты.</p>
+          <p className="hint">
+            Добавьте GitHub-репозиторий (например, <code>BeamMP/BeamMP</code> или
+            ссылку на него) в настройках — его последний релиз появится здесь.
+          </p>
+          <button className="btn btn-primary" onClick={onOpenSettings}>
+            Добавить источник
+          </button>
+        </div>
+      )}
+
+      {!loading && visible.length === 0 && !error && source !== "custom" && (
         <div className="browser-empty">Моды не найдены</div>
       )}
 
-      <div className="mod-grid">
+      <div className="mod-grid" data-size={cardSize}>
         {visible.map((item) => (
           <ModCard
             key={item.id}

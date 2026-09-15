@@ -2,6 +2,7 @@ use crate::models::{DownloadState, InstallRequest};
 use crate::sources;
 use anyhow::{anyhow, Context, Result};
 use futures_util::StreamExt;
+use log::{error, info, warn};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -102,11 +103,13 @@ pub async fn start(
         sources::resolve_download(client, &req.source, &req.key, repo_token.as_deref())
             .await
             .map_err(|e| anyhow!("{e}"))?;
+    info!("resolve: source={} url={url} → {filename}", req.source);
 
     // Если файл уже установлен (есть в папке модов) — не перезаписываем архив,
     // а сообщаем пользователю
     let final_path = mods_dir.join(&filename);
     if final_path.exists() {
+        warn!("мод `{filename}` уже установлен");
         return Err(anyhow!(
             "мод `{filename}` уже установлен в папке модов. Удалите его там, чтобы переустановить."
         ));
@@ -159,6 +162,7 @@ pub async fn start(
                 dl.speed_bps = 0;
                 let state = dl.to_state();
                 let _ = app.emit("download::finished", state);
+                info!("успешно: {filename} ({} байт)", dl.received);
             }
             (Err(e), Some(dl)) => {
                 dl.phase = Phase::Error;
@@ -166,8 +170,10 @@ pub async fn start(
                 dl.error = Some(e.to_string());
                 let state = dl.to_state();
                 let _ = app.emit("download::finished", state);
+                error!("ошибка загрузки {filename}: {e}");
             }
             (Err(e), None) => {
+                error!("ошибка загрузки {task_key}: {e}");
                 let _ = app.emit(
                     "download::finished",
                     DownloadState {

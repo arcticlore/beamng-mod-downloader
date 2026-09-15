@@ -15,6 +15,20 @@
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
 }
 
+[data-theme="light"] {
+  --bg: #eef1f7;
+  --bg-soft: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #e5eaf4;
+  --border: #d3dae8;
+  --text: #1b2437;
+  --text-dim: #5b6a86;
+  --ok: #16853f;
+  --err: #d63350;
+  --warn: #a96a00;
+  --shadow: 0 8px 30px rgba(31, 41, 66, 0.14);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -205,6 +219,16 @@ body,
   gap: 14px;
 }
 
+.mod-grid[data-size="compact"] {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+}
+
+.mod-grid[data-size="large"] {
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 18px;
+}
+
 .mod-card {
   display: flex;
   flex-direction: column;
@@ -366,7 +390,7 @@ body,
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #7db3ff);
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
   border-radius: 4px;
   transition: width 0.15s ease;
 }
@@ -607,6 +631,76 @@ body,
 
 .manual-row .search-input {
   flex: 1;
+}
+
+/* ---------- customization controls ---------- */
+.theme-toggle {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.theme-toggle .btn-active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.accent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch-active {
+  border-color: var(--text);
+  outline: 2px solid var(--accent);
+}
+
+.color-input {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.repo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.repo-row code {
+  color: var(--accent);
+  word-break: break-all;
 }
 
 /* ---------- toast ---------- */

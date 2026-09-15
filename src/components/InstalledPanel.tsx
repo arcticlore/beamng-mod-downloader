@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import { listInstalled, removeInstalled } from "../api";
-import type { InstalledMod } from "../types";
+import type { AppSettings, InstalledMod } from "../types";
 import { formatBytes } from "../types";
 
-export function InstalledPanel({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function InstalledPanel({
+  onOpenSettings,
+  settings,
+}: {
+  onOpenSettings: () => void;
+  settings: AppSettings | null;
+}) {
   const [items, setItems] = useState<InstalledMod[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(
+    () => settings?.installedCollapsed ?? false,
+  );
 
   const refresh = () => {
     listInstalled()
@@ -45,56 +54,68 @@ export function InstalledPanel({ onOpenSettings }: { onOpenSettings: () => void 
   }
 
   const total = items.reduce((acc, m) => acc + m.sizeBytes, 0);
-  const sorted = [...items].sort((a, b) => b.modified - a.modified);
+  const sortKey = settings?.installedSort ?? "date";
+  const sorted = [...items].sort((a, b) => {
+    if (sortKey === "name") return a.filename.localeCompare(b.filename);
+    if (sortKey === "size") return b.sizeBytes - a.sizeBytes;
+    return b.modified - a.modified;
+  });
 
   return (
     <div className="installed">
       <div className="installed-summary">
         Установлено архивов: {items.length} · всего {formatBytes(total)}
-        <button className="btn btn-sm" onClick={refresh}>
-          Обновить
+        <button className="btn btn-sm" onClick={() => setCollapsed((v) => !v)}>
+          {collapsed ? "Развернуть" : "Свернуть"}
         </button>
+        {!collapsed && (
+          <button className="btn btn-sm" onClick={refresh}>
+            Обновить
+          </button>
+        )}
       </div>
-      <table className="installed-table">
-        <thead>
-          <tr>
-            <th>Файл</th>
-            <th>Источник</th>
-            <th>Размер</th>
-            <th>Изменён</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((m) => (
-            <tr key={m.path}>
-              <td title={m.path}>{m.filename}</td>
-              <td>
-                <span className={`badge ${m.source === "repo" ? "badge-repo" : "badge-local"}`}>
-                  {m.source === "repo" ? "репо" : "локально"}
-                </span>
-              </td>
-              <td>{formatBytes(m.sizeBytes)}</td>
-              <td>{new Date(m.modified * 1000).toLocaleDateString("ru-RU")}</td>
-              <td>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={async () => {
-                    try {
-                      await removeInstalled(m.filename);
-                      refresh();
-                    } catch (e) {
-                      alert(String(e));
-                    }
-                  }}
-                >
-                  Удалить
-                </button>
-              </td>
+      {!collapsed && (
+        <table className="installed-table">
+          <thead>
+            <tr>
+              <th>Файл</th>
+              <th>Источник</th>
+              <th>Размер</th>
+              <th>Изменён</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((m) => (
+              <tr key={m.path}>
+                <td title={m.path}>{m.filename}</td>
+                <td>
+                  <span className={`badge ${m.source === "repo" ? "badge-repo" : "badge-local"}`}>
+                    {m.source === "repo" ? "репо" : "локально"}
+                  </span>
+                </td>
+                <td>{formatBytes(m.sizeBytes)}</td>
+                <td>{new Date(m.modified * 1000).toLocaleDateString("ru-RU")}</td>
+                <td>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={async () => {
+                      try {
+                        await removeInstalled(m.filename);
+                        refresh();
+                      } catch (e) {
+                        alert(String(e));
+                      }
+                    }}
+                  >
+                    Удалить
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

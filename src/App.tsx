@@ -1,30 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { getDownloads, getModsFolder, installMod, listInstalled } from "./api";
+import { getDownloads, getModsFolder, getSettings, installMod, listInstalled } from "./api";
+import { applyAppearance } from "./theme";
 import { DetailModal } from "./components/DetailModal";
 import { InstalledPanel } from "./components/InstalledPanel";
 import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
-import { installedFileName, type DownloadState, type InstalledMod, type ModItem } from "./types";
+import {
+  installedFileName,
+  type AppSettings,
+  type DownloadState,
+  type InstalledMod,
+  type ModItem,
+} from "./types";
 
-type Tab = "worldofmods" | "beamngweb" | "github" | "beamng" | "installed";
+type Tab = "worldofmods" | "beamngweb" | "github" | "custom" | "beamng" | "installed";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "worldofmods", label: "WorldOfMods" },
   { id: "beamngweb", label: "Официальный сайт" },
   { id: "github", label: "GitHub-релизы" },
+  { id: "custom", label: "Свои источники" },
   { id: "beamng", label: "Репозиторий (токен)" },
   { id: "installed", label: "Установленные" },
 ];
 
 export default function App() {
   const [modsFolder, setModsFolder] = useState<string | null>(null);
+  const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [tab, setTab] = useState<Tab>("worldofmods");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ModItem | null>(null);
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    applyAppearance(settings);
+  }, [settings]);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -43,6 +56,7 @@ export default function App() {
 
   useEffect(() => {
     getModsFolder().then(setModsFolder).catch(() => {});
+    getSettings().then(setSettingsState).catch(() => {});
     refreshInstalled();
     setDownloadsBySnapshot();
     const un1 = listen<DownloadState>("download::progress", (e) => {
@@ -155,12 +169,16 @@ export default function App() {
             downloads={downloads}
             installedNames={installedNames}
             tokenWarning={tokenWarning}
+            cardSize={settings?.cardSize ?? "normal"}
             onInstall={onInstall}
             onInfo={setDetailItem}
-            onTokenRequest={() => setSettingsOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
         ) : (
-          <InstalledPanel onOpenSettings={() => setSettingsOpen(true)} />
+          <InstalledPanel
+            settings={settings}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
         )}
       </main>
 
@@ -169,6 +187,7 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
           onChanged={() => {
             getModsFolder().then(setModsFolder).catch(() => {});
+            getSettings().then(setSettingsState).catch(() => {});
             refreshInstalled();
           }}
         />

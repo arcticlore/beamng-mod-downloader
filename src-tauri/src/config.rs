@@ -1,3 +1,4 @@
+use crate::models::CustomRepo;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -7,6 +8,12 @@ use std::path::PathBuf;
 pub struct Config {
     pub mods_folder: Option<String>,
     pub repo_token: Option<String>,
+    pub theme: Option<String>,
+    pub accent: Option<String>,
+    pub installed_sort: Option<String>,
+    pub installed_collapsed: Option<bool>,
+    pub card_size: Option<String>,
+    pub custom_repos: Vec<CustomRepo>,
 }
 
 impl Config {

@@ -199,9 +199,20 @@ pub async fn detail(
     })
 }
 
+/// Информация о конкретном репозитории через core API (60 req/час без токена).
+/// Используется для пользовательских источников, где список репозиториев задан
+/// вручную и поиск не нужен.
+pub async fn repo_info(client: &reqwest::Client, full: &str) -> Result<ModItem, SourceError> {
+    let url = format!("{API}/repos/{full}");
+    let body = gh_get(client, &url).await?;
+    let it: SearchItem = serde_json::from_str(&body)
+        .map_err(|e| SourceError::Parse(format!("GitHub ответил не JSON: {e}")))?;
+    Ok(item(&it))
+}
+
 /// Извлечение `owner/repo` из URL вида `https://github.com/owner/repo`.
 /// Дополнительные сегменты пути (tree/main и т.п.) игнорируются.
-fn repo_from_key(key: &str) -> Result<String, SourceError> {
+pub(crate) fn repo_from_key(key: &str) -> Result<String, SourceError> {
     let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() < 4 || parts[1] != "github.com" {
         return Err(SourceError::Parse(format!(
@@ -458,6 +469,11 @@ mod tests {
         .await
         .expect("detail");
         assert_eq!(d.item.name, "BeamMP/BeamMP");
+
+        let info = repo_info(&client, "BeamMP/BeamMP")
+            .await
+            .expect("repo_info");
+        assert_eq!(info.name, "BeamMP/BeamMP");
 
         let (url, filename) = resolve_download(&client, "https://github.com/BeamMP/BeamMP", None)
             .await

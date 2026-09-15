@@ -79,3 +79,28 @@ pub struct SourceCategory {
     pub id: String,
     pub label: String,
 }
+
+/// Пользовательские настройки интерфейса (тема, акцент, панель модов).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    /// "dark" | "light".
+    pub theme: Option<String>,
+    /// HEX-цвет акцента, например "#4f8cff".
+    pub accent: Option<String>,
+    /// Сортировка установленных: "date" | "name" | "size".
+    pub installed_sort: Option<String>,
+    /// Сворачивать таблицу установленных до сводки.
+    pub installed_collapsed: Option<bool>,
+    /// Размер карточек в браузере: "compact" | "normal" | "large".
+    pub card_size: Option<String>,
+}
+
+/// Пользовательский источник: GitHub-репозиторий, закреплённый в настройках.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomRepo {
+    /// "owner/repo".
+    pub full: String,
+    pub label: Option<String>,
+}
