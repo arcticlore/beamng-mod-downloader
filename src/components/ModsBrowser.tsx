@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCategories, searchMods } from "../api";
-import { installedFileName, type DownloadState, type ModItem, type SourceCategory } from "../types";
+import {
+  BROWSER_SORTS,
+  installedFileName,
+  type DownloadState,
+  type ModItem,
+  type SourceCategory,
+} from "../types";
 import { ModCard } from "./ModCard";
+
+const AGGREGATE_SOURCES = ["worldofmods", "beamngweb", "github", "beamng"];
+
+function dateOf(published: string | null): number {
+  if (!published) return 0;
+  const ms = Date.parse(published);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function popOf(m: ModItem): number {
+  const n = Number((m.downloads ?? "").replace(/[^\d]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
 
 interface Props {
   source: string;
@@ -28,6 +47,7 @@ export function ModsBrowser({
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState<string>("all");
+  const [sort, setSort] = useState<string>("relevance");
   const [categories, setCategories] = useState<SourceCategory[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -48,9 +68,34 @@ export function ModsBrowser({
       setLoading(true);
       setError(null);
       try {
-        const res = await searchMods(src, q || null, cat === "all" ? null : cat, pg);
-        setItems(res.items);
-        setTotalPages(res.totalPages || 1);
+        if (src === "all") {
+          const merged: ModItem[] = [];
+          const seen = new Set<string>();
+          let anyOk = false;
+          await Promise.all(
+            AGGREGATE_SOURCES.map(async (s) => {
+              try {
+                const res = await searchMods(s, q || null, null, 1);
+                anyOk = true;
+                for (const it of res.items) {
+                  if (!seen.has(it.id)) {
+                    seen.add(it.id);
+                    merged.push(it);
+                  }
+                }
+              } catch (e) {
+                console.warn(`источник ${s} недоступен во вкладке «Все»:`, e);
+              }
+            }),
+          );
+          if (!anyOk) throw new Error("все источники сейчас недоступны");
+          setItems(merged);
+          setTotalPages(1);
+        } else {
+          const res = await searchMods(src, q || null, cat === "all" ? null : cat, pg);
+          setItems(res.items);
+          setTotalPages(res.totalPages || 1);
+        }
       } catch (e) {
         setError(String(e));
         setItems([]);
@@ -70,10 +115,24 @@ export function ModsBrowser({
   }, [source, category, page, debouncedQuery, load]);
 
   const visible = useMemo(() => {
-    if (!debouncedQuery) return items;
-    const q = debouncedQuery.toLowerCase();
-    return items.filter((m) => m.name.toLowerCase().includes(q));
-  }, [items, debouncedQuery]);
+    let list = items;
+    if (debouncedQuery) {
+      const q = debouncedQuery.toLowerCase();
+      list = list.filter((m) => m.name.toLowerCase().includes(q));
+    }
+    if (sort === "name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    } else if (sort === "updated") {
+      list = [...list].sort(
+        (a, b) => dateOf(b.published) - dateOf(a.published),
+      );
+    } else if (sort === "popularity") {
+      list = [...list].sort((a, b) => popOf(b) - popOf(a));
+    } else if (sort === "size") {
+      list = [...list].sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0));
+    }
+    return list;
+  }, [items, debouncedQuery, sort]);
 
   return (
     <div className="browser">
@@ -97,6 +156,18 @@ export function ModsBrowser({
             ))}
           </select>
         )}
+        <select
+          className="category-select"
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          title="Сортировка"
+        >
+          {BROWSER_SORTS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
         <span className="browser-count">{visible.length} модов</span>
       </div>
 
@@ -113,20 +184,7 @@ export function ModsBrowser({
 
       {loading && <div className="browser-loading">Загрузка…</div>}
 
-      {!loading && visible.length === 0 && !error && source === "custom" && (
-        <div className="browser-empty">
-          <p>Свои источники пока пусты.</p>
-          <p className="hint">
-            Добавьте GitHub-репозиторий (например, <code>BeamMP/BeamMP</code> или
-            ссылку на него) в настройках — его последний релиз появится здесь.
-          </p>
-          <button className="btn btn-primary" onClick={onOpenSettings}>
-            Добавить источник
-          </button>
-        </div>
-      )}
-
-      {!loading && visible.length === 0 && !error && source !== "custom" && (
+      {!loading && visible.length === 0 && !error && (
         <div className="browser-empty">Моды не найдены</div>
       )}
 

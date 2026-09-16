@@ -68,11 +68,6 @@ export interface AppSettings {
   cardSize?: string | null;
 }
 
-export interface CustomRepo {
-  full: string;
-  label: string | null;
-}
-
 export const THEMES = [
   { id: "dark", label: "Тёмная" },
   { id: "light", label: "Светлая" },
@@ -90,11 +85,18 @@ export const INSTALLED_SORTS = [
   { id: "size", label: "По размеру" },
 ];
 
+export const BROWSER_SORTS = [
+  { id: "relevance", label: "Актуальность" },
+  { id: "updated", label: "По новизне" },
+  { id: "name", label: "По имени (А-Я)" },
+  { id: "popularity", label: "По популярности" },
+  { id: "size", label: "По размеру" },
+];
+
 export const SOURCES: Record<string, { id: string; label: string }> = {
   worldofmods: { id: "worldofmods", label: "WorldOfMods" },
   beamngweb: { id: "beamngweb", label: "Официальный сайт BeamNG" },
   github: { id: "github", label: "GitHub-релизы (без токена)" },
-  custom: { id: "custom", label: "Свои источники" },
   beamng: { id: "beamng", label: "Репозиторий BeamNG (токен)" },
 };
 
@@ -104,7 +106,7 @@ export function installedFileName(item: ModItem): string {
   const last = parts.pop() ?? "";
   if (item.source === "worldofmods") return last.replace(/\.html$/, "") + ".zip";
   if (item.source === "beamngweb") return last + ".zip";
-  if (item.source === "github" || item.source === "custom") {
+  if (item.source === "github") {
     const owner = parts.pop() ?? "";
     return `${owner}-${last}.zip`;
   }

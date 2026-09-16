@@ -14,13 +14,13 @@ import {
   type ModItem,
 } from "./types";
 
-type Tab = "worldofmods" | "beamngweb" | "github" | "custom" | "beamng" | "installed";
+type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "beamng" | "installed";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "Все" },
   { id: "worldofmods", label: "WorldOfMods" },
   { id: "beamngweb", label: "Официальный сайт" },
   { id: "github", label: "GitHub-релизы" },
-  { id: "custom", label: "Свои источники" },
   { id: "beamng", label: "Репозиторий (токен)" },
   { id: "installed", label: "Установленные" },
 ];

@@ -164,11 +164,16 @@ body,
 }
 
 .category-select {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent);
   color: var(--text);
   padding: 9px 10px;
   border-radius: 8px;
+}
+
+.category-select option {
+  background: var(--bg-soft);
+  color: var(--text);
 }
 
 .browser-count {
@@ -677,30 +682,6 @@ body,
   background: var(--bg-card);
   border-radius: 6px;
   cursor: pointer;
-}
-
-.repo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.repo-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
-}
-
-.repo-row code {
-  color: var(--accent);
-  word-break: break-all;
 }
 
 /* ---------- toast ---------- */

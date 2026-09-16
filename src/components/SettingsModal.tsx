@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
 import {
-  addCustomRepo,
   detectModsFolders,
-  getCustomRepos,
   getModsFolder,
   getRepoToken,
   getSettings,
   openExternal,
   openLogDir,
-  removeCustomRepo,
   setModsFolder,
   setModsFolderForce,
   setRepoToken,
   setSettings,
 } from "../api";
 import { applyAppearance, ACCENT_PRESETS } from "../theme";
-import type { AppSettings, CustomRepo, ModsFolderCandidate } from "../types";
+import type { AppSettings, ModsFolderCandidate } from "../types";
 import { CARD_SIZES, INSTALLED_SORTS, THEMES } from "../types";
 
 interface Props {
@@ -29,8 +26,6 @@ export function SettingsModal({ onClose, onChanged }: Props) {
   const [manual, setManual] = useState("");
   const [token, setToken] = useState("");
   const [settings, setSettingsState] = useState<AppSettings>({});
-  const [customRepos, setCustomRepos] = useState<CustomRepo[]>([]);
-  const [repoInput, setRepoInput] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -51,8 +46,6 @@ export function SettingsModal({ onClose, onChanged }: Props) {
       if (!cancelled) setToken(t ?? "");
       const s = await getSettings();
       if (!cancelled) setSettingsState(s);
-      const repos = await getCustomRepos();
-      if (!cancelled) setCustomRepos(repos);
     })();
     return () => {
       cancelled = true;
@@ -97,37 +90,6 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     try {
       await setRepoToken(token);
       setMsg({ ok: true, text: "Токен сохранён" });
-    } catch (e) {
-      setMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const addRepo = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const repos = await addCustomRepo(repoInput);
-      setCustomRepos(repos);
-      setRepoInput("");
-      setMsg({ ok: true, text: "Источник добавлен. Откройте вкладку «Свои источники»." });
-      onChanged();
-    } catch (e) {
-      setMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeRepo = async (full: string) => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const repos = await removeCustomRepo(full);
-      setCustomRepos(repos);
-      setMsg({ ok: true, text: `Источник ${full} удалён` });
-      onChanged();
     } catch (e) {
       setMsg({ ok: false, text: String(e) });
     } finally {
@@ -301,40 +263,6 @@ export function SettingsModal({ onClose, onChanged }: Props) {
               ))}
             </select>
           </div>
-        </section>
-
-        <section>
-          <h3>Свои источники (GitHub-репозитории)</h3>
-          <p className="hint">
-            Закрепите репозитории, из релизов которых хотите ставить моды. Они появятся
-            в одноимённой вкладке. Формат: <code>owner/repo</code> или полная ссылка.
-          </p>
-          <div className="manual-row">
-            <input
-              className="search-input"
-              placeholder="BeamMP/BeamMP"
-              value={repoInput}
-              onChange={(e) => setRepoInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addRepo();
-              }}
-            />
-            <button className="btn btn-primary" disabled={busy || !repoInput.trim()} onClick={addRepo}>
-              Добавить
-            </button>
-          </div>
-          {customRepos.length > 0 && (
-            <div className="repo-list">
-              {customRepos.map((r) => (
-                <div className="repo-row" key={r.full}>
-                  <code>{r.full}</code>
-                  <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => removeRepo(r.full)}>
-                    Удалить
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         <section>

@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { debug, error as logError } from "@tauri-apps/plugin-log";
 import type {
   AppSettings,
-  CustomRepo,
   DownloadState,
   InstallRequest,
   InstalledMod,
@@ -68,12 +67,5 @@ export const getSettings = () => call<AppSettings>("get_app_settings");
 
 export const setSettings = (settings: AppSettings) =>
   call<void>("set_app_settings", { settings });
-
-export const getCustomRepos = () => call<CustomRepo[]>("get_custom_repos");
-
-export const addCustomRepo = (repo: string) => call<CustomRepo[]>("add_custom_repo", { repo });
-
-export const removeCustomRepo = (full: string) =>
-  call<CustomRepo[]>("remove_custom_repo", { full });
 
 export const openLogDir = () => call<void>("open_log_dir");

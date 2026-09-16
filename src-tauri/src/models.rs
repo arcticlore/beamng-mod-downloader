@@ -95,12 +95,3 @@ pub struct AppSettings {
     /// Размер карточек в браузере: "compact" | "normal" | "large".
     pub card_size: Option<String>,
 }
-
-/// Пользовательский источник: GitHub-репозиторий, закреплённый в настройках.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct CustomRepo {
-    /// "owner/repo".
-    pub full: String,
-    pub label: Option<String>,
-}

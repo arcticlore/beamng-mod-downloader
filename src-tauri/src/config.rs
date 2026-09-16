@@ -1,4 +1,3 @@
-use crate::models::CustomRepo;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -13,7 +12,6 @@ pub struct Config {
     pub installed_sort: Option<String>,
     pub installed_collapsed: Option<bool>,
     pub card_size: Option<String>,
-    pub custom_repos: Vec<CustomRepo>,
 }
 
 impl Config {

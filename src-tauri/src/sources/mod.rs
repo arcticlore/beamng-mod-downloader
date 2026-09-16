@@ -56,8 +56,6 @@ pub async fn detail(
         "beamng" => beamng::detail(client, mod_id, key, repo_token).await,
         "beamngweb" => beamngweb::detail(client, mod_id, key).await,
         "github" => github::detail(client, mod_id, key).await,
-        // Пользовательские источники — те же GitHub-репозитории
-        "custom" => github::detail(client, mod_id, key).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),
@@ -76,8 +74,6 @@ pub async fn resolve_download(
         "beamng" => beamng::resolve_download(client, key, repo_token).await,
         "beamngweb" => beamngweb::resolve_download(client, key, repo_token).await,
         "github" => github::resolve_download(client, key, repo_token).await,
-        // Пользовательские источники — те же GitHub-репозитории
-        "custom" => github::resolve_download(client, key, repo_token).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),
@@ -95,8 +91,5 @@ pub fn categories(source: &str) -> Vec<SourceCategory> {
 }
 
 pub fn validate_source(source: &str) -> bool {
-    matches!(
-        source,
-        "worldofmods" | "beamng" | "beamngweb" | "github" | "custom"
-    )
+    matches!(source, "worldofmods" | "beamng" | "beamngweb" | "github")
 }
