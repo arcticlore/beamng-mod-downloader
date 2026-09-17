@@ -18,7 +18,7 @@ impl Config {
     pub fn config_path() -> Result<PathBuf> {
         let dir = dirs::config_dir()
             .context("не удалось определить каталог конфигурации пользователя")?
-            .join("bimka-mod-installer");
+            .join("beamng-mod-downloader");
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("не удалось создать {}", dir.display()))?;
         Ok(dir.join("config.json"))

@@ -153,7 +153,7 @@ mod tests {
 
     fn temp_dir() -> PathBuf {
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        std::env::temp_dir().join(format!("bimka-test-{}-{}", std::process::id(), n))
+        std::env::temp_dir().join(format!("beamng-dl-test-{}-{}", std::process::id(), n))
     }
 
     #[test]

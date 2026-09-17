@@ -335,7 +335,7 @@ pub fn run() {
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("bimka.log".to_string()),
+                        file_name: Some("beamng.log".to_string()),
                     }),
                 ])
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
@@ -352,7 +352,7 @@ pub fn run() {
             };
             app.manage(state);
             info!(
-                "Bimka Mod Installer v{} запущен ({})",
+                "BeamNG Mod Downloader v{} запущен ({})",
                 env!("CARGO_PKG_VERSION"),
                 std::env::consts::OS
             );
@@ -378,5 +378,5 @@ pub fn run() {
             open_log_dir
         ])
         .run(tauri::generate_context!())
-        .expect("ошибка запуска Bimka Mod Installer");
+        .expect("ошибка запуска BeamNG Mod Downloader");
 }

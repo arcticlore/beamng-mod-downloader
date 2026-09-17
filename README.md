@@ -1,4 +1,4 @@
-# Bimka Mod Installer
+# BeamNG Mod Downloader
 
 Кроссплатформенный установщик модов для **BeamNG.drive** на Tauri 2 (Rust) + React.
 
@@ -15,10 +15,10 @@
 - сортировка в браузере модов: актуальность / новизна / имя / популярность / размер;
 - карточки модов: имя, автор, аватарка, описание, счётчик скачиваний, размер;
 - кастомизация интерфейса: тёмная/светлая тема, акцентный цвет, размер карточек, сортировка и сворачивание панели установленных;
-- логирование: файл `bimka.log` в каталоге данных приложения (текущая скорость, ошибки сети, действия), консоль фронтенда продублирована туда же; в настройках есть кнопка «Открыть папку логов»;
+- логирование: файл `beamng.log` в каталоге данных приложения (текущая скорость, ошибки сети, действия), консоль фронтенда продублирована туда же; в настройках есть кнопка «Открыть папку логов»;
 - скачивание с прогрессом (текущая скорость, байты), установка прямо в папку модов (папку `mods` текущей версии);
 - вкладка «Установленные» со списком `.zip`, удаление;
-- конфиг хранится в `~/.config/bimka-mod-installer/config.json` (`modsFolder`, `repoToken`, `theme`, `accent`, `installedSort`, `installedCollapsed`, `cardSize`).
+- конфиг хранится в `~/.config/beamng-mod-downloader/config.json` (`modsFolder`, `repoToken`, `theme`, `accent`, `installedSort`, `installedCollapsed`, `cardSize`).
 
 ## Структура
 
@@ -49,7 +49,7 @@ Ubuntu/Debian: `libwebkit2gtk-4.1-dev librsvg2-dev`.
 Сборка и запуск:
 
 ```bash
-cd bimka-mod-installer
+cd beamng-mod-downloader
 npm install
 npx tauri dev          # запуск в dev-режиме
 npx tauri build        # сборка релиза (AppImage/.deb/.rpm и т.п.)
@@ -73,8 +73,8 @@ BeamNG.drive при входе в аккаунт beamng.com (отдельног�
 
 ## Логи
 
-Подробный лог приложения пишется в файл `bimka.log` в каталоге данных приложения
-(`app_log_dir`, например `~/.local/share/com.bimka.modinstaller/logs/` на Linux).
+Подробный лог приложения пишется в файл `beamng.log` в каталоге данных приложения
+(`app_log_dir`, например `~/.local/share/com.beamng.mod-downloader/logs/` на Linux).
 В него попадают: запуск приложения, смена папки модов и токена,
 каждый invoke-вызов, ошибки поиска/скачивания (включая rate limit GitHub), ну и консоль
 фронтенда (через `attachConsole` плагина `tauri-plugin-log`). В настройках есть кнопка
@@ -82,9 +82,9 @@ BeamNG.drive при входе в аккаунт beamng.com (отдельног�
 
 ## Конфиг
 
-- Linux: `~/.config/bimka-mod-installer/config.json`
-- Windows: `%APPDATA%/bimka-mod-installer/config.json`
-- macOS: `~/Library/Application Support/bimka-mod-installer/config.json`
+- Linux: `~/.config/beamng-mod-downloader/config.json`
+- Windows: `%APPDATA%/beamng-mod-downloader/config.json`
+- macOS: `~/Library/Application Support/beamng-mod-downloader/config.json`
 
 Поля: `mods_folder` — путь к папке модов; `repo_token` — токен BeamNG; `theme` — `"dark"`/
 `"light"`; `accent` — HEX-цвет; `installed_sort` — `"date"`/`"name"`/`"size"`;

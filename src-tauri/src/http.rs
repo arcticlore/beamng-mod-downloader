@@ -3,7 +3,7 @@ use std::time::Duration;
 
 pub const DEFAULT_UA: &str = concat!(
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ",
-    "Chrome/126.0 Safari/537.36 BimkaModInstaller/",
+    "Chrome/126.0 Safari/537.36 BeamNGModDownloader/",
     env!("CARGO_PKG_VERSION")
 );
 

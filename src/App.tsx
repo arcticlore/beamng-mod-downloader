@@ -134,7 +134,7 @@ export default function App() {
       <header className="app-header">
         <div className="app-title">
           <span className="app-logo">🚗</span>
-          <h1>Bimka Mod Installer</h1>
+          <h1>BeamNG Mod Downloader</h1>
         </div>
         <div className="header-right">
           <span

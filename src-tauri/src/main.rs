@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    bimka_mod_installer_lib::run()
+    beamng_mod_downloader_lib::run()
 }

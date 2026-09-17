@@ -269,7 +269,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
           <h3>Логи</h3>
           <p className="hint">
             Приложение пишет подробный лог (загрузки, ошибки сети, действия) в файл
-            <code> bimka.log</code> в каталоге данных приложения.
+            <code> beamng.log</code> в каталоге данных приложения.
           </p>
           <button className="btn" onClick={openLogs}>
             Открыть папку логов
