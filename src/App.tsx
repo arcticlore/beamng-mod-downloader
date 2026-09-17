@@ -14,14 +14,13 @@ import {
   type ModItem,
 } from "./types";
 
-type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "beamng" | "installed";
+type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "installed";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "Все" },
   { id: "worldofmods", label: "WorldOfMods" },
   { id: "beamngweb", label: "Официальный сайт" },
   { id: "github", label: "GitHub-релизы" },
-  { id: "beamng", label: "Репозиторий (токен)" },
   { id: "installed", label: "Установленные" },
 ];
 
@@ -123,12 +122,6 @@ export default function App() {
     [showToast],
   );
 
-  const tokenWarning = useMemo(() => {
-    // нет реального сигнала о невалидном токене до первого поиска — подсветим,
-    // если папка не выбрана для установки, а токен мог не сохраняться
-    return false;
-  }, []);
-
   return (
     <div className="app">
       <header className="app-header">
@@ -168,11 +161,9 @@ export default function App() {
             source={tab}
             downloads={downloads}
             installedNames={installedNames}
-            tokenWarning={tokenWarning}
             cardSize={settings?.cardSize ?? "normal"}
             onInstall={onInstall}
             onInfo={setDetailItem}
-            onOpenSettings={() => setSettingsOpen(true)}
           />
         ) : (
           <InstalledPanel

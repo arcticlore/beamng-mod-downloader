@@ -37,7 +37,6 @@ struct DownloadJob<'a> {
     final_path: PathBuf,
     key: &'a str,
     source: &'a str,
-    repo_token: Option<&'a str>,
 }
 
 impl ActiveDownload {
@@ -89,7 +88,6 @@ pub async fn start(
     table: &DownloadTable,
     mods_folder: &str,
     req: InstallRequest,
-    repo_token: Option<String>,
 ) -> Result<String> {
     if !sources::validate_source(&req.source) {
         return Err(anyhow!("неизвестный источник `{}`", req.source));
@@ -99,10 +97,9 @@ pub async fn start(
         .await
         .with_context(|| format!("не удалось создать {}", mods_dir.display()))?;
 
-    let (url, filename) =
-        sources::resolve_download(client, &req.source, &req.key, repo_token.as_deref())
-            .await
-            .map_err(|e| anyhow!("{e}"))?;
+    let (url, filename) = sources::resolve_download(client, &req.source, &req.key)
+        .await
+        .map_err(|e| anyhow!("{e}"))?;
     info!("resolve: source={} url={url} → {filename}", req.source);
 
     // Если файл уже установлен (есть в папке модов) — не перезаписываем архив,
@@ -149,7 +146,6 @@ pub async fn start(
             final_path,
             key: &task_key,
             source: &req.source,
-            repo_token: repo_token.as_deref(),
         };
         let result = run_download(&app, &client, &table, &job).await;
 
@@ -204,11 +200,6 @@ async fn run_download(
     let mut req = client.get(job.url);
     if job.source == "worldofmods" {
         req = req.header(reqwest::header::REFERER, "https://www.worldofmods.com/");
-    }
-    if job.source == "beamng" {
-        if let Some(token) = job.repo_token {
-            req = req.header("Authorization", format!("Bearer {token}"));
-        }
     }
 
     let response = req

@@ -341,7 +341,6 @@ pub async fn detail(
 pub async fn resolve_download(
     client: &reqwest::Client,
     key: &str,
-    _token: Option<&str>,
 ) -> Result<(String, String), SourceError> {
     let mut html = http::fetch_string(client, key, None).await?;
     let mut url = page_payload(&html).download_url;
@@ -512,7 +511,7 @@ mod tests {
                 Ok(d) => assert!(!d.item.name.is_empty()),
                 Err(_) => continue,
             }
-            if let Ok((url, filename)) = resolve_download(&client, &item.key, None).await {
+            if let Ok((url, filename)) = resolve_download(&client, &item.key).await {
                 assert!(url.contains("download?version="), "url: {url}");
                 assert!(filename.ends_with(".zip"), "filename: {filename}");
                 resolved += 1;

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub mods_folder: Option<String>,
-    pub repo_token: Option<String>,
     pub theme: Option<String>,
     pub accent: Option<String>,
     pub installed_sort: Option<String>,

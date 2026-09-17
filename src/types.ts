@@ -96,8 +96,7 @@ export const BROWSER_SORTS = [
 export const SOURCES: Record<string, { id: string; label: string }> = {
   worldofmods: { id: "worldofmods", label: "WorldOfMods" },
   beamngweb: { id: "beamngweb", label: "Официальный сайт BeamNG" },
-  github: { id: "github", label: "GitHub-релизы (без токена)" },
-  beamng: { id: "beamng", label: "Репозиторий BeamNG (токен)" },
+  github: { id: "github", label: "GitHub-релизы" },
 };
 
 /** Имя zip-файла, который будет создан при установке этого мода, по его ключу. */

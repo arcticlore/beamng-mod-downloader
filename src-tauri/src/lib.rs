@@ -14,7 +14,6 @@ use models::{
     ModsFolderCandidate, SourceCategory,
 };
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -29,15 +28,6 @@ pub struct AppState {
     pub config: Mutex<Config>,
     pub downloads: download::DownloadTable,
     pub listing_cache: Arc<Mutex<HashMap<String, (Instant, ModSearchResult)>>>,
-}
-
-impl AppState {
-    fn repo_token(&self) -> Option<String> {
-        self.config
-            .lock()
-            .ok()
-            .and_then(|cfg| cfg.repo_token.clone())
-    }
 }
 
 #[tauri::command]
@@ -78,24 +68,6 @@ fn set_mods_folder_force(state: State<'_, AppState>, path: String) -> Result<(),
     cfg.save().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn get_repo_token(state: State<'_, AppState>) -> Option<String> {
-    state.repo_token()
-}
-
-#[tauri::command]
-fn set_repo_token(state: State<'_, AppState>, token: String) -> Result<(), String> {
-    let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
-    cfg.repo_token = if token.trim().is_empty() {
-        info!("repo token очищен");
-        None
-    } else {
-        info!("repo token сохранён (len={})", token.trim().len());
-        Some(token.trim().to_string())
-    };
-    cfg.save().map_err(|e| e.to_string())
-}
-
 /// Открывает ссылку в системном браузере (автоматический переход на нужную
 /// страницу: вход в beamng.com, документация и т.п.).
 #[tauri::command]
@@ -133,16 +105,10 @@ async fn search_mods(
     category: Option<String>,
     page: u32,
 ) -> Result<ModSearchResult, String> {
-    let token = state.repo_token();
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    if let Some(t) = &token {
-        t.hash(&mut hasher);
-    }
     let key = format!(
-        "{source}|{}|{}|{page}|{}",
+        "{source}|{}|{}|{page}",
         query.as_deref().unwrap_or(""),
-        category.as_deref().unwrap_or(""),
-        hasher.finish()
+        category.as_deref().unwrap_or("")
     );
 
     if let Ok(cache) = state.listing_cache.lock() {
@@ -160,7 +126,6 @@ async fn search_mods(
         query.as_deref(),
         category.as_deref(),
         page,
-        token.as_deref(),
     )
     .await
     .map_err(|e| {
@@ -181,9 +146,8 @@ async fn get_mod_detail(
     mod_id: String,
     key: String,
 ) -> Result<ModDetail, String> {
-    let token = state.repo_token();
     debug!("detail: source={source}, id={mod_id}");
-    let result = sources::detail(&state.client, &source, &mod_id, &key, token.as_deref())
+    let result = sources::detail(&state.client, &source, &mod_id, &key)
         .await
         .map_err(|e| {
             warn!("detail error ({source}): {e}");
@@ -207,25 +171,16 @@ async fn install_mod(
         "установка: source={}, id={}, name={}",
         req.source, req.mod_id, req.name
     );
-    let (mods_folder, token) = {
-        let cfg = state.config.lock().map_err(|e| e.to_string())?;
-        (
-            cfg.mods_folder
-                .clone()
-                .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?,
-            cfg.repo_token.clone(),
-        )
-    };
-    download::start(
-        &app,
-        &state.client,
-        &state.downloads,
-        &mods_folder,
-        req,
-        token,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let mods_folder = state
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .mods_folder
+        .clone()
+        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+    download::start(&app, &state.client, &state.downloads, &mods_folder, req)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -363,8 +318,6 @@ pub fn run() {
             detect_mods_folders,
             set_mods_folder,
             set_mods_folder_force,
-            get_repo_token,
-            set_repo_token,
             open_url,
             search_mods,
             get_mod_detail,

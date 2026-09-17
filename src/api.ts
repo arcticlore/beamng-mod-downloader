@@ -31,10 +31,6 @@ export const setModsFolder = (path: string, force = false) =>
 
 export const setModsFolderForce = (path: string) => call<void>("set_mods_folder_force", { path });
 
-export const getRepoToken = () => call<string | null>("get_repo_token");
-
-export const setRepoToken = (token: string) => call<void>("set_repo_token", { token });
-
 export const openExternal = (url: string) => call<void>("open_url", { url });
 
 export const searchMods = (

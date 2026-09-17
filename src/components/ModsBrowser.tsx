@@ -9,7 +9,7 @@ import {
 } from "../types";
 import { ModCard } from "./ModCard";
 
-const AGGREGATE_SOURCES = ["worldofmods", "beamngweb", "github", "beamng"];
+const AGGREGATE_SOURCES = ["worldofmods", "beamngweb", "github"];
 
 function dateOf(published: string | null): number {
   if (!published) return 0;
@@ -26,22 +26,18 @@ interface Props {
   source: string;
   downloads: Record<string, DownloadState>;
   installedNames: Set<string>;
-  tokenWarning: boolean;
   cardSize: string;
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
-  onOpenSettings: () => void;
 }
 
 export function ModsBrowser({
   source,
   downloads,
   installedNames,
-  tokenWarning,
   cardSize,
   onInstall,
   onInfo,
-  onOpenSettings,
 }: Props) {
   const [items, setItems] = useState<ModItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -170,15 +166,6 @@ export function ModsBrowser({
         </select>
         <span className="browser-count">{visible.length} модов</span>
       </div>
-
-      {tokenWarning && source === "beamng" && (
-        <div className="banner banner-warn">
-          Для репозитория BeamNG нужен токен авторизации.
-          <button className="btn btn-sm" onClick={onOpenSettings}>
-            Задать токен в настройках
-          </button>
-        </div>
-      )}
 
       {error && <div className="banner banner-error">{error}</div>}
 

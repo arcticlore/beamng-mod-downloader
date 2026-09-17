@@ -289,7 +289,6 @@ fn pick_asset(html: &str) -> Option<String> {
 pub async fn resolve_download(
     client: &reqwest::Client,
     key: &str,
-    _token: Option<&str>,
 ) -> Result<(String, String), SourceError> {
     let full = repo_from_key(key)?;
     if let Some(url) = cached_release(&full) {
@@ -459,7 +458,7 @@ mod tests {
         .expect("detail");
         assert_eq!(d.item.name, "BeamMP/BeamMP");
 
-        let (url, filename) = resolve_download(&client, "https://github.com/BeamMP/BeamMP", None)
+        let (url, filename) = resolve_download(&client, "https://github.com/BeamMP/BeamMP")
             .await
             .expect("resolve");
         assert!(url.starts_with("https://"), "url: {url}");
