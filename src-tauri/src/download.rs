@@ -150,9 +150,9 @@ pub async fn start(
         let result = run_download(&app, &client, &table, &job).await;
 
         let mut map = table.lock().await;
-        let entry = map.get_mut(&task_key);
+        let entry = map.remove(&task_key);
         match (result, entry) {
-            (Ok(()), Some(dl)) => {
+            (Ok(()), Some(mut dl)) => {
                 dl.phase = Phase::Done;
                 dl.received = dl.total.unwrap_or(dl.received);
                 dl.speed_bps = 0;
@@ -160,7 +160,7 @@ pub async fn start(
                 let _ = app.emit("download::finished", state);
                 info!("успешно: {filename} ({} байт)", dl.received);
             }
-            (Err(e), Some(dl)) => {
+            (Err(e), Some(mut dl)) => {
                 dl.phase = Phase::Error;
                 dl.speed_bps = 0;
                 dl.error = Some(e.to_string());

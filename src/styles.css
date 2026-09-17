@@ -13,6 +13,7 @@
   --warn: #ffb648;
   --radius: 10px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --scheme: dark;
 }
 
 [data-theme="light"] {
@@ -27,6 +28,7 @@
   --err: #d63350;
   --warn: #a96a00;
   --shadow: 0 8px 30px rgba(31, 41, 66, 0.14);
+  --scheme: light;
 }
 
 * {
@@ -164,16 +166,22 @@ body,
 }
 
 .category-select {
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--bg-hover);
   border: 1px solid var(--accent);
   color: var(--text);
   padding: 9px 10px;
   border-radius: 8px;
+  font-family: inherit;
+  font-size: inherit;
+  color-scheme: var(--scheme);
 }
 
 .category-select option {
   background: var(--bg-soft);
   color: var(--text);
+  font-family: inherit;
 }
 
 .browser-count {

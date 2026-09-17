@@ -291,8 +291,9 @@ pub async fn resolve_download(
     key: &str,
 ) -> Result<(String, String), SourceError> {
     let full = repo_from_key(key)?;
+    let zip_name = format!("{}.zip", full.replace('/', "-"));
     if let Some(url) = cached_release(&full) {
-        return Ok((url, format!("{full}.zip")));
+        return Ok((url, zip_name));
     }
 
     let base = format!("https://github.com/{full}");
@@ -319,7 +320,7 @@ pub async fn resolve_download(
     })?;
 
     cache_release(&full, &url);
-    Ok((url, format!("{full}.zip")))
+    Ok((url, zip_name))
 }
 
 #[cfg(test)]
