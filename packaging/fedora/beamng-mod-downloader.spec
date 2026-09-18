@@ -1,5 +1,10 @@
 %global appname beamng-mod-downloader
 
+# В vendor/ (cargo vendor в тигр) есть .rs-файлы, начинающиеся с `#![...]`,
+# rpm считает их битыми shebang'ами и валит %install на brp-mangle-shebangs.
+# Исключаем всё дерево BUILDBOOT из этого шага — у нас нет скриптов с shebang.
+%global __brp_mangle_shebangs_exclude %{_buildrootdir}/.*
+
 Name:           beamng-mod-downloader
 Version:        @PARENT_TAG@
 Release:        1%{?dist}
