@@ -59,6 +59,7 @@ log "  vite (dist/)"
 log "  cargo vendor"
 (cd "$SRC" && cargo vendor --locked --manifest-path src-tauri/Cargo.toml vendor >/dev/null)
 
+mkdir -p "$SRC/.cargo"
 cat > "$SRC/.cargo/config.toml" <<'EOF'
 [source.crates-io]
 replace-with = "vendored-sources"
