@@ -57,7 +57,7 @@ log "  vite (dist/)"
 (cd "$SRC" && npm ci --no-audit --no-fund && npm run build)
 
 log "  cargo vendor"
-(cd "$SRC" && cargo vendor --locked vendor >/dev/null)
+(cd "$SRC" && cargo vendor --locked --manifest-path src-tauri/Cargo.toml vendor >/dev/null)
 
 cat > "$SRC/.cargo/config.toml" <<'EOF'
 [source.crates-io]
