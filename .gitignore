@@ -19,3 +19,7 @@ Thumbs.db
 *.log
 .cache/
 __pycache__/
+
+# Packaging
+_pkg/
+.obs-checkout/

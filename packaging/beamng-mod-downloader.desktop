@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=BeamNG Mod Downloader
+Comment=Установщик модов для BeamNG.drive
+GenericName=Mod Downloader
+Exec=beamng-mod-downloader
+Icon=beamng-mod-downloader
+Terminal=false
+Type=Application
+Categories=Utility;Game;
+StartupNotify=true
+Keywords=BeamNG;mods;download;

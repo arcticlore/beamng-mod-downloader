@@ -56,12 +56,13 @@ pub async fn detail(
     }
 }
 
-/// Возвращает финальный URL для скачивания архива мода и безопасное имя файла.
+/// Возвращает финальный URL для скачивания архива мода, безопасное имя файла
+/// и дату (версию) на источнике на момент установки — для записи в ledger.
 pub async fn resolve_download(
     client: &reqwest::Client,
     source: &str,
     key: &str,
-) -> Result<(String, String), SourceError> {
+) -> Result<(String, String, Option<String>), SourceError> {
     match source {
         "worldofmods" => worldofmods::resolve_download(client, key).await,
         "beamngweb" => beamngweb::resolve_download(client, key).await,

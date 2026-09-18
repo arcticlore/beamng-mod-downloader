@@ -1,0 +1,51 @@
+%global appname beamng-mod-downloader
+
+Name:           beamng-mod-downloader
+Version:        @PARENT_TAG@
+Release:        1%{?dist}
+Summary:        Кроссплатформенный установщик модов для BeamNG.drive
+License:        MIT
+URL:            https://github.com/arcticlore/beamng-mod-downloader
+Source0:        %{name}-%{version}.tar.xz
+
+BuildRequires:  gcc-c++
+
+# Пакеты дистрибутива (rpm-цели OBS). rust/nodejs не обязательны в
+# BuildRequires: obs-build.sh сам приведёт тулчейн к рабочему состоянию.
+%if 0%{?fedora}
+BuildRequires:  webkit2gtk4.1-devel
+BuildRequires:  pkgconfig(ayatana-appindicator3-0.1)
+%else
+BuildRequires:  typelib-1_0-JavaScriptCore-4_1
+BuildRequires:  typelib-1_0-WebKit2-4_1
+BuildRequires:  libayatana-appindicator-devel
+%endif
+BuildRequires:  pkgconfig(gtk+-3.0)
+BuildRequires:  librsvg2-devel
+BuildRequires:  pkgconfig(openssl)
+BuildRequires:  pkgconfig
+BuildRequires:  curl
+
+%description
+Поиск папок модов BeamNG.drive, загрузка модов из нескольких источников
+с прогрессом, просмотр имён, аватаров и описаний.
+
+%prep
+%setup -q -n %{name}-%{version}
+
+%build
+bash packaging/obs-build.sh build
+
+%install
+bash packaging/obs-build.sh install %{buildroot}
+
+%files
+%{_bindir}/%{appname}
+%{_datadir}/applications/%{appname}.desktop
+%{_datadir}/icons/hicolor/128x128/apps/%{appname}.png
+%{_datadir}/icons/hicolor/256x256/apps/%{appname}.png
+%{_datadir}/licenses/%{appname}/LICENSE
+
+%changelog
+* Thu Sep 18 2026 arcticlore <arcticlore@users.noreply.github.com> - @PARENT_TAG@-1
+- Регулярная сборка из git-ветки main.

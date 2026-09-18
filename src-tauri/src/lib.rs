@@ -23,6 +23,8 @@ use tauri::{Manager, State};
 /// Сколько времени держим ответы поиска в памяти, чтобы возврат на страницу
 /// / переключение категорий не били по сети повторно.
 const SEARCH_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(20);
+/// Верхний предел записей кэша поиска (защита от роста памяти при долгой сессии).
+const SEARCH_CACHE_MAX: usize = 512;
 
 pub struct AppState {
     pub client: reqwest::Client,
@@ -80,13 +82,19 @@ fn open_url(url: String) -> Result<(), String> {
     let opened = std::process::Command::new("xdg-open")
         .arg(&url)
         .spawn()
+        .and_then(|mut c| c.wait())
         .is_ok();
     #[cfg(target_os = "macos")]
-    let opened = std::process::Command::new("open").arg(&url).spawn().is_ok();
+    let opened = std::process::Command::new("open")
+        .arg(&url)
+        .spawn()
+        .and_then(|mut c| c.wait())
+        .is_ok();
     #[cfg(target_os = "windows")]
     let opened = std::process::Command::new("cmd")
         .args(["/C", "start", "", &url])
         .spawn()
+        .and_then(|mut c| c.wait())
         .is_ok();
 
     if opened {
@@ -138,6 +146,12 @@ async fn search_mods(
     })?;
 
     if let Ok(mut cache) = state.listing_cache.lock() {
+        // Выметаем просроченные записи при каждой вставке — этим же
+        // ограничиваем размер кэша (хранятся только свежие ответы).
+        cache.retain(|_, (at, _)| at.elapsed() < SEARCH_CACHE_TTL);
+        if cache.len() >= SEARCH_CACHE_MAX {
+            cache.clear();
+        }
         cache.insert(key, (Instant::now(), result.clone()));
     }
     Ok(result)
@@ -222,7 +236,18 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
         .mods_folder
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
-    let full = PathBuf::from(&mods_folder).join(&path);
+
+    // Защита от выхода за пределы папки модов: допускаем только относительные
+    // пути без `..`, которые могут прийти из сканирования файловой системы.
+    let rel = PathBuf::from(&path);
+    if rel.is_absolute()
+        || rel
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_) | std::path::Component::RootDir))
+    {
+        return Err("недопустимый путь для удаления".to_string());
+    }
+    let full = PathBuf::from(&mods_folder).join(&rel);
     installer::remove_file(&full.display().to_string()).map_err(|e| e.to_string())?;
     ledger::remove(&path);
     Ok(())
@@ -230,24 +255,34 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
 
 /// Проверяет установленные лаунчером моды на наличие обновлений:
 /// сравнивает дату публикации на источнике с той, что была при установке.
+/// Источником истины служит ledger: там лежат настоящие source/key и версия
+/// на момент установки (поля `InstalledMod.source/key` из выборки для этого
+/// ненадёжны — installer помечает моды как local/repo).
 #[tauri::command]
 async fn check_updates(
     state: State<'_, AppState>,
     items: Vec<InstalledMod>,
 ) -> Result<Vec<ModUpdate>, String> {
+    let ledger = ledger::load();
     let mut out = Vec::new();
     for it in items {
-        let key = match &it.key {
-            Some(k) => k.clone(),
-            None => continue,
+        let Some(entry) = ledger.get(&it.filename) else {
+            // Мод не устанавливали через лаунчер — пропускаем.
+            continue;
         };
         let filename = it.filename.clone();
-        let source = it.source.clone();
-        let installed = it.published.clone();
-        let latest = sources::detail(&state.client, &source, &filename, &key)
-            .await
-            .ok()
-            .and_then(|d| d.item.published);
+        let source = entry.source.clone();
+        let key = entry.key.clone();
+        let installed = entry.published.clone();
+        // mod_id ни для чего важного не используется: detail ходит по key.
+        let result = sources::detail(&state.client, &source, &filename, &key).await;
+        let (latest, error) = match result {
+            Ok(d) => (d.item.published, None),
+            Err(e) => {
+                warn!("проверка обновления {filename} ({source}) не удалась: {e}");
+                (None, Some(e.to_string()))
+            }
+        };
         let has_update = match (&installed, &latest) {
             (Some(a), Some(b)) => a != b,
             _ => false,
@@ -259,7 +294,7 @@ async fn check_updates(
             installed_published: installed,
             latest_published: latest,
             has_update,
-            error: None,
+            error,
         });
     }
     Ok(out)
@@ -323,13 +358,19 @@ fn open_path(path: &str) -> bool {
     let opened = std::process::Command::new("xdg-open")
         .arg(path)
         .spawn()
+        .and_then(|mut c| c.wait())
         .is_ok();
     #[cfg(target_os = "macos")]
-    let opened = std::process::Command::new("open").arg(path).spawn().is_ok();
+    let opened = std::process::Command::new("open")
+        .arg(path)
+        .spawn()
+        .and_then(|mut c| c.wait())
+        .is_ok();
     #[cfg(target_os = "windows")]
     let opened = std::process::Command::new("explorer")
         .arg(path)
         .spawn()
+        .and_then(|mut c| c.wait())
         .is_ok();
     opened
 }

@@ -1,0 +1,5 @@
+beamng-mod-downloader (@PARENT_TAG@) unstable; urgency=low
+
+  * Регулярная сборка из git-ветки main.
+
+ -- arcticlore <arcticlore@users.noreply.github.com>  Thu, 18 Sep 2026 00:00:00 +0000

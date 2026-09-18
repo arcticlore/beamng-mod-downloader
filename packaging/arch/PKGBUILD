@@ -1,0 +1,24 @@
+# Maintainer: arcticlore <arcticlore@users.noreply.github.com>
+# Сборка из официального tag-релиза. Перед релизом: $ updpkgsums
+
+pkgname=beamng-mod-downloader
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="Кроссплатформенный установщик модов для BeamNG.drive (Tauri 2)"
+arch=('x86_64')
+url="https://github.com/arcticlore/beamng-mod-downloader"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+makedepends=('nodejs' 'npm' 'rust' 'cargo' 'base-devel' 'pkgconf' 'curl')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/arcticlore/beamng-mod-downloader/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    bash packaging/obs-build.sh build
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+    bash packaging/obs-build.sh install "$pkgdir"
+}

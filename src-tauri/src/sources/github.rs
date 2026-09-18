@@ -293,14 +293,17 @@ fn pick_asset(html: &str) -> Option<String> {
 /// Возвращает (url последнего релиза, имя локального файла).
 /// Имя файла детерминировано (`owner-repo.zip`), чтобы UI мог сопоставлять
 /// карточку с уже установленным модом без знания имени ассета.
+/// Даты (`published`) здесь нет: для GitHub версию мода отслеживаем по
+/// `updated_at` репозитория из `detail` — она же сохраняется в ledger
+/// из `InstallRequest.published` при установке.
 pub async fn resolve_download(
     client: &reqwest::Client,
     key: &str,
-) -> Result<(String, String), SourceError> {
+) -> Result<(String, String, Option<String>), SourceError> {
     let full = repo_from_key(key)?;
     let zip_name = format!("{}.zip", full.replace('/', "-"));
     if let Some(url) = cached_release(&full) {
-        return Ok((url, zip_name));
+        return Ok((url, zip_name, None));
     }
 
     let base = format!("https://github.com/{full}");
@@ -327,7 +330,7 @@ pub async fn resolve_download(
     })?;
 
     cache_release(&full, &url);
-    Ok((url, zip_name))
+    Ok((url, zip_name, None))
 }
 
 #[cfg(test)]
@@ -466,7 +469,7 @@ mod tests {
         .expect("detail");
         assert_eq!(d.item.name, "BeamMP/BeamMP");
 
-        let (url, filename) = resolve_download(&client, "https://github.com/BeamMP/BeamMP")
+        let (url, filename, _) = resolve_download(&client, "https://github.com/BeamMP/BeamMP")
             .await
             .expect("resolve");
         assert!(url.starts_with("https://"), "url: {url}");

@@ -97,7 +97,7 @@ pub async fn start(
         .await
         .with_context(|| format!("не удалось создать {}", mods_dir.display()))?;
 
-    let (url, filename) = sources::resolve_download(client, &req.source, &req.key)
+    let (url, filename, source_published) = sources::resolve_download(client, &req.source, &req.key)
         .await
         .map_err(|e| anyhow!("{e}"))?;
     info!("resolve: source={} url={url} → {filename}", req.source);
@@ -139,8 +139,11 @@ pub async fn start(
     let table = table.clone();
     let part_path = mods_dir.join(format!(".{filename}.part"));
     let ledger_source = req.source.clone();
+    let ledger_key = req.key.clone();
     let ledger_name = req.name.clone();
-    let ledger_published = req.published.clone();
+    // Версию на источнике лучше брать из той же страницы, что позже
+    // сравнивает check_updates (иначе даты будут разными сигналами).
+    let ledger_published = source_published.or_else(|| req.published.clone());
 
     tokio::spawn(async move {
         let job = DownloadJob {
@@ -165,7 +168,7 @@ pub async fn start(
                 crate::ledger::upsert(crate::ledger::LedgerEntry {
                     filename: filename.clone(),
                     source: ledger_source,
-                    key: task_key,
+                    key: ledger_key,
                     name: ledger_name,
                     installed_at: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -240,7 +243,14 @@ async fn run_download(
     let mut last_emit: Option<Instant> = None;
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.context("ошибка чтения потока загрузки")?;
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(e) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(&job.part_path).await;
+                return Err(anyhow!("ошибка чтения потока загрузки: {e}"));
+            }
+        };
         received += chunk.len() as u64;
         file.write_all(&chunk)
             .await
@@ -277,6 +287,17 @@ async fn run_download(
     if received == 0 {
         let _ = tokio::fs::remove_file(&job.part_path).await;
         return Err(anyhow!("файл пуст — похоже, ссылка устарела"));
+    }
+
+    // Недосканный архив — не ставим битый мод: при известном размере требуем
+    // совпадение полученного объёма с заявленным сервером.
+    if let Some(expected) = total {
+        if received != expected {
+            let _ = tokio::fs::remove_file(&job.part_path).await;
+            return Err(anyhow!(
+                "загрузка оборвалась: получено {received} из {expected} байт"
+            ));
+        }
     }
 
     tokio::fs::rename(&job.part_path, &job.final_path)

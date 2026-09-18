@@ -343,6 +343,21 @@ fn page_payload(html: &str) -> ResourcePage {
     }
 }
 
+/// Дату последнего обновления берём из секции «Recent Updates» той же страницы,
+/// на которую позже (при проверке обновлений) смотрит `detail`.
+fn published_from_page(html: &str) -> Option<String> {
+    let doc = Html::parse_document(html);
+    Selector::parse(".section.updates .DateTime")
+        .ok()
+        .and_then(|sel| doc.select(&sel).next())
+        .and_then(|n| {
+            n.value()
+                .attr("data-datestring")
+                .or_else(|| n.value().attr("title"))
+                .map(ToOwned::to_owned)
+        })
+}
+
 pub async fn detail(
     client: &reqwest::Client,
     mod_id: &str,
@@ -350,6 +365,7 @@ pub async fn detail(
 ) -> Result<ModDetail, SourceError> {
     let html = http::fetch_string(client, key, None).await?;
     let p = page_payload(&html);
+    let published = published_from_page(&html);
 
     Ok(ModDetail {
         item: ModItem {
@@ -361,7 +377,7 @@ pub async fn detail(
             key: key.to_string(),
             category: None,
             author: p.author,
-            published: None,
+            published,
             downloads: None,
             size_bytes: p.size_bytes,
         },
@@ -375,7 +391,7 @@ pub async fn detail(
 pub async fn resolve_download(
     client: &reqwest::Client,
     key: &str,
-) -> Result<(String, String), SourceError> {
+) -> Result<(String, String, Option<String>), SourceError> {
     let mut html = http::fetch_string(client, key, None).await?;
     let mut url = page_payload(&html).download_url;
     if url.is_none() {
@@ -387,6 +403,8 @@ pub async fn resolve_download(
         SourceError::Parse("не найдена кнопка скачивания на странице мода".into())
     })?;
 
+    let published = published_from_page(&html);
+
     let slug = key
         .trim_end_matches('/')
         .rsplit('/')
@@ -394,7 +412,7 @@ pub async fn resolve_download(
         .unwrap_or("mod");
     let filename = http::sanitize_filename(slug) + ".zip";
 
-    Ok((url, filename))
+    Ok((url, filename, published))
 }
 
 #[cfg(test)]
@@ -430,6 +448,15 @@ mod tests {
         </head><body>
           <div class="resourceDetails">
             <a href="resources/authors/lj74.330398/">LJ74</a>
+          </div>
+          <div class="section updates">
+            <h3 class="textHeading">Recent Updates</h3>
+            <ol>
+              <li><a href="resources/1982-hirochi-rush-demo.28903/update?update=72681">0.39 Refresh</a>
+                  <span class="postDate"><abbr class="DateTime" data-time="0" data-datestring="Sep 14, 2026">Sep 14, 2026</abbr></span></li>
+              <li><a href="resources/1982-hirochi-rush-demo.28903/update?update=1">0.38</a>
+                  <span class="postDate"><abbr class="DateTime" data-datestring="Nov 7, 2023">Nov 7, 2023</abbr></span></li>
+            </ol>
           </div>
           <blockquote class="messageText">
             Great <b>car</b> demo.
@@ -523,6 +550,15 @@ mod tests {
     }
 
     #[test]
+    fn published_from_page_takes_latest_update_date() {
+        assert_eq!(
+            published_from_page(sample_detail()).as_deref(),
+            Some("Sep 14, 2026")
+        );
+        assert_eq!(published_from_page("<html></html>"), None);
+    }
+
+    #[test]
     fn absolute_handles_all_forms() {
         assert_eq!(
             absolute(BASE, "resources/x.1/"),
@@ -554,7 +590,7 @@ mod tests {
                 Ok(d) => assert!(!d.item.name.is_empty()),
                 Err(_) => continue,
             }
-            if let Ok((url, filename)) = resolve_download(&client, &item.key).await {
+            if let Ok((url, filename, _)) = resolve_download(&client, &item.key).await {
                 assert!(url.contains("download?version="), "url: {url}");
                 assert!(filename.ends_with(".zip"), "filename: {filename}");
                 resolved += 1;

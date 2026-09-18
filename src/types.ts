@@ -112,12 +112,23 @@ export const SOURCES: Record<string, { id: string; label: string }> = {
   github: { id: "github", label: "GitHub-релизы" },
 };
 
+/** Санитизация имени файла — зеркалит `sanitize_filename` в src-tauri/src/http.rs. */
+export function sanitizeFileName(raw: string): string {
+  let cleaned = raw
+    .trim()
+    .replace(/[\/\\:*?"<>|\0]/g, "_")
+    .replace(/\s/g, "_")
+    .replace(/\.+$/g, "");
+  if (!cleaned) cleaned = "mod";
+  return cleaned;
+}
+
 /** Имя zip-файла, который будет создан при установке этого мода, по его ключу. */
 export function installedFileName(item: ModItem): string {
   const parts = item.key.split("/").filter(Boolean);
   const last = parts.pop() ?? "";
-  if (item.source === "worldofmods") return last.replace(/\.html$/, "") + ".zip";
-  if (item.source === "beamngweb") return last + ".zip";
+  if (item.source === "worldofmods") return sanitizeFileName(last.replace(/\.html$/, "")) + ".zip";
+  if (item.source === "beamngweb") return sanitizeFileName(last) + ".zip";
   if (item.source === "github") {
     const owner = parts.pop() ?? "";
     return `${owner}-${last}.zip`;

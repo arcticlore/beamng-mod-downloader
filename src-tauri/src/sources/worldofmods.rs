@@ -194,6 +194,17 @@ fn og_content(doc: &Html, property: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// Дата публикации мода на WorldOfMods (`<time datetime=...>` на странице мода).
+/// Сайт не выставляет отдельную дату последнего обновления, поэтому эта дата
+/// стабильна по времени — обновления на этом источнике не детектируются.
+fn published_from_page(doc: &Html) -> Option<String> {
+    Selector::parse("time[datetime]")
+        .ok()
+        .and_then(|sel| doc.select(&sel).next())
+        .and_then(|t| t.value().attr("datetime"))
+        .map(ToOwned::to_owned)
+}
+
 pub async fn detail(
     client: &reqwest::Client,
     mod_id: &str,
@@ -205,6 +216,7 @@ pub async fn detail(
     let name = og_content(&doc, "og:title").unwrap_or_else(|| mod_id.to_string());
     let thumbnail = og_content(&doc, "og:image");
     let short = og_content(&doc, "og:description");
+    let published = published_from_page(&doc);
 
     let full_description = Selector::parse(".article-body")
         .ok()
@@ -252,7 +264,7 @@ pub async fn detail(
             key: key.to_string(),
             category: None,
             author: None,
-            published: None,
+            published,
             downloads: None,
             size_bytes: None,
         },
@@ -266,8 +278,12 @@ pub async fn detail(
 pub async fn resolve_download(
     client: &reqwest::Client,
     page_url: &str,
-) -> Result<(String, String), SourceError> {
+) -> Result<(String, String, Option<String>), SourceError> {
     let html = http::fetch_string(client, page_url, Some(&format!("{BASE}/"))).await?;
+    let published = {
+        let doc = Html::parse_document(&html);
+        published_from_page(&doc)
+    };
     let manual_href = manual_download_href(&html).ok_or_else(|| {
         SourceError::Parse("не найдена ссылка на скачивание с WorldOfMods".into())
     })?;
@@ -307,7 +323,7 @@ pub async fn resolve_download(
         .to_string();
     let filename = http::sanitize_filename(&filename) + ".zip";
 
-    Ok((final_url, filename))
+    Ok((final_url, filename, published))
 }
 
 fn manual_download_href(html: &str) -> Option<String> {
@@ -432,8 +448,23 @@ mod tests {
         let d = detail(&client, &item.id, &item.key).await.expect("detail");
         assert!(!d.item.name.is_empty());
 
-        let (url, filename) = resolve_download(&client, &item.key).await.expect("resolve");
+        let (url, filename, _) = resolve_download(&client, &item.key).await.expect("resolve");
         assert!(url.starts_with("https://"));
         assert!(filename.ends_with(".zip"));
+    }
+
+    #[test]
+    fn published_from_page_reads_time_datetime() {
+        let doc = Html::parse_document(
+            r#"<div class="col-sm-6 text-right">
+                 <i class="glyphicon glyphicon-time" title="Published"></i>&nbsp;
+                 <time datetime="2016-04-06T04:08:50-04:00" title="06.04.2016 04:08:50">06.04.2016 04:08:50</time>
+               </div>"#,
+        );
+        assert_eq!(
+            published_from_page(&doc).as_deref(),
+            Some("2016-04-06T04:08:50-04:00")
+        );
+        assert_eq!(published_from_page(&Html::parse_document("<html></html>")), None);
     }
 }

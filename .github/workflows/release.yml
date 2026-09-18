@@ -1,0 +1,81 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: --bundles appimage,deb,rpm
+            name: bundles-linux
+          - platform: windows-latest
+            args: --bundles nsis,msi
+            name: bundles-windows
+          - platform: macos-latest
+            args: ""
+            name: bundles-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload bundle
+        uses: tauri-apps/tauri-action@v1
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: "1"
+        with:
+          tagName: v__VERSION__
+          releaseName: BeamNG Mod Downloader v__VERSION__
+          releaseDraft: true
+          releaseBody: |
+            Автоматическая сборка из тега v__VERSION__.
+
+            - Linux: AppImage, deb, rpm
+            - Windows: NSIS (.exe), MSI
+            - macOS: DMG
+
+            Пакеты дистрибутивов (Ubuntu/Debian/Fedora/openSUSE) — репозиторий
+            OBS `home:arcticlore:apps`, см. packaging/README.md.
+          args: ${{ matrix.args }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            src-tauri/target/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14

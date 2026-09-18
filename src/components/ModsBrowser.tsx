@@ -89,7 +89,7 @@ export function ModsBrowser({
                 const res = await Promise.all(
                   Array.from({ length: pages }, async (_, i) => {
                     try {
-                      return await searchMods(s, q || null, null, i + 1);
+                      return await searchMods(s, q || null, null, i + 1, ord);
                     } catch (e) {
                       console.warn(`источник ${s} (стр. ${i + 1}) недоступен:`, e);
                       return null;
