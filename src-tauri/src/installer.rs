@@ -54,6 +54,8 @@ fn collect_zips(root: &Path, dir: &Path, out: &mut Vec<InstalledMod>) -> Result<
             size_bytes: meta.len(),
             modified,
             source,
+            key: None,
+            published: None,
         });
     }
     Ok(())

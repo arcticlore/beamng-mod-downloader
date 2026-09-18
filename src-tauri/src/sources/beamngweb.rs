@@ -53,16 +53,35 @@ fn category_path(category: &str) -> &str {
         .unwrap_or("")
 }
 
-fn listing_url(category: &str, page: u32) -> String {
+fn listing_url(category: &str, page: u32, order: &str) -> String {
     let path = category_path(category);
     let page = page.max(1);
     let mut url = format!("{BASE}/resources/");
+    let mut params: Vec<String> = Vec::new();
+    if !path.is_empty() || page > 1 {
+        params.push(format!("page={page}"));
+    }
     if !path.is_empty() {
-        url.push_str(&format!("?categories/{path}&page={page}"));
-    } else if page > 1 {
-        url.push_str(&format!("?page={page}"));
+        params.insert(0, format!("categories/{path}"));
+    }
+    if let Some(o) = order_param(order) {
+        params.push(format!("order={o}"));
+    }
+    if !params.is_empty() {
+        url.push('?');
+        url.push_str(&params.join("&"));
     }
     url
+}
+
+/// Маппинг сортировок пользователя на параметр `order` XenForo.
+fn order_param(order: &str) -> Option<&'static str> {
+    match order {
+        "updated" => Some("update_date"),
+        "name" => Some("title"),
+        "popularity" => Some("download_count"),
+        _ => None,
+    }
 }
 
 fn absolute(base: &str, href: &str) -> String {
@@ -103,6 +122,7 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
     let sel_cat = Selector::parse(".resourceDetails a[href*=\"/categories/\"]").unwrap();
     let sel_datetime = Selector::parse(".resourceDetails .DateTime").unwrap();
     let sel_tagline = Selector::parse(".tagLine").unwrap();
+    let sel_downloads = Selector::parse(".resourceDownloads dd").unwrap();
 
     let mut items = Vec::new();
     for li in doc.select(&sel_item) {
@@ -156,6 +176,19 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
             })
             .filter(|t| !t.is_empty());
 
+        let downloads = li
+            .select(&sel_downloads)
+            .next()
+            .map(|n| {
+                n.text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .split(|c: char| !c.is_ascii_digit())
+                    .collect::<Vec<_>>()
+                    .concat()
+            })
+            .filter(|s| !s.is_empty());
+
         items.push(ModItem {
             id: format!("beamngweb:{id}"),
             source: "beamngweb".to_string(),
@@ -166,7 +199,7 @@ fn parse_listing(html: &str, page: u32) -> Result<ModSearchResult, SourceError> 
             category: cat_name,
             author,
             published,
-            downloads: None,
+            downloads,
             size_bytes: None,
         });
     }
@@ -183,8 +216,9 @@ pub async fn search(
     _query: Option<&str>,
     category: Option<&str>,
     page: u32,
+    order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
-    let url = listing_url(category.unwrap_or("all"), page);
+    let url = listing_url(category.unwrap_or("all"), page, order.unwrap_or(""));
     let html = http::fetch_string(client, &url, None).await?;
     let mut result = parse_listing(&html, page)?;
     // pageNavHeader показывает *глобальное* число страниц ресурсов, а не
@@ -383,6 +417,7 @@ mod tests {
                   <a href="resources/categories/land.3/">Land</a>
                 </div>
                 <div class="tagLine">Demo version of the Hirochi RUSH</div>
+                <dl class="resourceDownloads"><dt>Downloads:</dt> <dd>10,170</dd></dl>
               </div>
             </li>
           </ol>
@@ -411,18 +446,26 @@ mod tests {
 
     #[test]
     fn listing_url_formats() {
-        assert_eq!(listing_url("all", 1), "https://www.beamng.com/resources/");
+        assert_eq!(listing_url("all", 1, ""), "https://www.beamng.com/resources/");
         assert_eq!(
-            listing_url("all", 2),
+            listing_url("all", 2, ""),
             "https://www.beamng.com/resources/?page=2"
         );
         assert_eq!(
-            listing_url("vehicles", 1),
+            listing_url("vehicles", 1, ""),
             "https://www.beamng.com/resources/?categories/vehicles.2&page=1"
         );
         assert_eq!(
-            listing_url("vehicles", 3),
+            listing_url("vehicles", 3, ""),
             "https://www.beamng.com/resources/?categories/vehicles.2&page=3"
+        );
+        assert_eq!(
+            listing_url("vehicles", 1, "popularity"),
+            "https://www.beamng.com/resources/?categories/vehicles.2&page=1&order=download_count"
+        );
+        assert_eq!(
+            listing_url("all", 1, "updated"),
+            "https://www.beamng.com/resources/?order=update_date"
         );
     }
 
@@ -438,7 +481,7 @@ mod tests {
         assert_eq!(it.author.as_deref(), Some("LJ74"));
         assert_eq!(it.published.as_deref(), Some("Nov 7, 2023 at 10:07 AM"));
         assert_eq!(it.category.as_deref(), Some("Land"));
-        assert_eq!(it.downloads, None);
+        assert_eq!(it.downloads.as_deref(), Some("10170"));
         assert_eq!(
             it.thumbnail.as_deref(),
             Some("https://www.beamng.com/data/resource_icons/28/28903.jpg?t")
@@ -496,7 +539,7 @@ mod tests {
     #[ignore]
     async fn network_listing_detail_and_resolve() {
         let client = crate::http::build_client().expect("http client");
-        let list = search(&client, None, Some("vehicles"), 1)
+        let list = search(&client, None, Some("vehicles"), 1, None)
             .await
             .expect("listing");
         assert!(!list.items.is_empty(), "официальный листинг пуст");

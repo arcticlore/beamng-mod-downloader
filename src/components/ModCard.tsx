@@ -6,6 +6,7 @@ import { ProgressBar } from "./ProgressBar";
 interface Props {
   item: ModItem;
   installed: boolean;
+  similar?: { filename: string; path: string } | null;
   dl: DownloadState | undefined;
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
@@ -17,7 +18,7 @@ function installedTail(dl: DownloadState | undefined) {
   return undefined;
 }
 
-export function ModCard({ item, installed, dl, onInstall, onInfo }: Props) {
+export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Props) {
   const active = installedTail(dl);
   const disabled = !!active || installed;
 
@@ -29,6 +30,12 @@ export function ModCard({ item, installed, dl, onInstall, onInfo }: Props) {
     if (item.sizeBytes) parts.push(formatBytes(item.sizeBytes));
     return parts.join(" · ");
   }, [item]);
+
+  const warning = similar
+    ? `Похожий мод уже установлен: ${similar.filename}`
+    : installed
+      ? "Уже в папке модов"
+      : undefined;
 
   return (
     <div className={`mod-card ${installed ? "mod-card-installed" : ""}`}>
@@ -46,6 +53,7 @@ export function ModCard({ item, installed, dl, onInstall, onInfo }: Props) {
         <h3 className="mod-name" title={item.name}>
           {item.name}
         </h3>
+        {warning && <div className="mod-warning">{warning}</div>}
         {meta && <div className="mod-meta">{meta}</div>}
         {item.description && (
           <p className="mod-desc">{item.description.slice(0, 190)}</p>
@@ -83,10 +91,12 @@ export function ModCard({ item, installed, dl, onInstall, onInfo }: Props) {
                   ? "Уже в папке модов"
                   : active?.state === "error"
                     ? active.error ?? "Ошибка загрузки"
-                    : "Скачать и установить"
+                    : similar
+                      ? "Похожий мод уже установлен — установка запросит подтверждение"
+                      : "Скачать и установить"
               }
             >
-              {installed ? "✓ Установлено" : active ? "Ошибка" : "Установить"}
+              {installed ? "✓ Установлено" : active ? "Ошибка" : similar ? "Есть похожий" : "Установить"}
             </button>
           </div>
         )}

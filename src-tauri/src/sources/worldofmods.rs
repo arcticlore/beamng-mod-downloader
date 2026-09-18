@@ -171,6 +171,7 @@ pub async fn search(
     _query: Option<&str>,
     category: Option<&str>,
     page: u32,
+    _order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
     let url = listing_url(category.unwrap_or("all"), page);
     let html = http::fetch_string(client, &url, Some(&format!("{BASE}/"))).await?;
@@ -419,7 +420,7 @@ mod tests {
     #[ignore]
     async fn network_listing_detail_and_resolve() {
         let client = crate::http::build_client().expect("http client");
-        let list = search(&client, None, Some("cars"), 1)
+        let list = search(&client, None, Some("cars"), 1, None)
             .await
             .expect("listing");
         assert!(!list.items.is_empty(), "листинг WorldOfMods пуст");

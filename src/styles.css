@@ -320,6 +320,17 @@ body,
   margin-bottom: 6px;
 }
 
+.mod-warning {
+  color: var(--warn, #d9a530);
+  font-size: 12px;
+  margin-bottom: 6px;
+  background: var(--bg-hover, transparent);
+  border: 1px solid var(--warn, #d9a530);
+  border-radius: 6px;
+  padding: 4px 8px;
+  word-break: break-word;
+}
+
 .mod-desc {
   color: var(--text-dim);
   font-size: 12px;
@@ -690,6 +701,106 @@ body,
   background: var(--bg-card);
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* ---------- загрузки (Steam-стиль) ---------- */
+.downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.downloads-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-muted, inherit);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.downloads-total {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.downloads-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.download-row-active {
+  border-color: var(--accent);
+}
+
+.download-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.download-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.download-eta,
+.download-size {
+  font-size: 12px;
+  color: var(--text-muted, var(--text));
+  font-variant-numeric: tabular-nums;
+}
+
+.download-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.download-progress .progress,
+.download-progress .progress-track {
+  flex: 1;
+  width: 220px;
+}
+
+.download-speed {
+  font-size: 12px;
+  color: var(--text-muted, var(--text));
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge-ok {
+  background: var(--ok, #1f9d55);
+  color: #fff;
+}
+
+.badge-error {
+  background: var(--danger, #d64541);
+  color: #fff;
 }
 
 /* ---------- toast ---------- */

@@ -41,6 +41,7 @@ pub struct InstallRequest {
     pub mod_id: String,
     pub name: String,
     pub key: String,
+    pub published: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -56,7 +57,7 @@ pub struct DownloadState {
     pub error: Option<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledMod {
     pub filename: String,
@@ -64,6 +65,24 @@ pub struct InstalledMod {
     pub size_bytes: u64,
     pub modified: u64,
     pub source: String,
+    /// Запись о происхождении: какую версию (дату публикации) мы видели при установке.
+    pub key: Option<String>,
+    pub published: Option<String>,
+}
+
+/// Результат проверки обновления одного установленного мода.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdate {
+    pub filename: String,
+    pub source: String,
+    pub key: String,
+    /// Версия, установленная лаунчером (когда мы её поставили).
+    pub installed_published: Option<String>,
+    /// Текущая версия на источнике.
+    pub latest_published: Option<String>,
+    pub has_update: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]

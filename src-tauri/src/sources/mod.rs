@@ -28,11 +28,12 @@ pub async fn search(
     query: Option<&str>,
     category: Option<&str>,
     page: u32,
+    order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
     match source {
-        "worldofmods" => worldofmods::search(client, query, category, page).await,
-        "beamngweb" => beamngweb::search(client, query, category, page).await,
-        "github" => github::search(client, query, category, page).await,
+        "worldofmods" => worldofmods::search(client, query, category, page, order).await,
+        "beamngweb" => beamngweb::search(client, query, category, page, order).await,
+        "github" => github::search(client, query, category, page, order).await,
         other => Err(SourceError::Unavailable(format!(
             "неизвестный источник `{other}`"
         ))),

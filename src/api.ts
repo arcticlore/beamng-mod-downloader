@@ -8,6 +8,7 @@ import type {
   ModDetail,
   ModSearchResult,
   ModsFolderCandidate,
+  ModUpdate,
   SourceCategory,
 } from "./types";
 
@@ -38,12 +39,14 @@ export const searchMods = (
   query: string | null,
   category: string | null,
   page: number,
+  order?: string | null,
 ) =>
   call<ModSearchResult>("search_mods", {
     source,
     query,
     category,
     page,
+    order: order ?? null,
   });
 
 export const getModDetail = (source: string, modId: string, key: string) =>
@@ -58,6 +61,8 @@ export const getDownloads = () => call<DownloadState[]>("get_downloads");
 export const listInstalled = () => call<InstalledMod[]>("list_installed");
 
 export const removeInstalled = (path: string) => call<void>("remove_installed", { path });
+
+export const checkUpdates = (items: InstalledMod[]) => call<ModUpdate[]>("check_updates", { items });
 
 export const getSettings = () => call<AppSettings>("get_app_settings");
 

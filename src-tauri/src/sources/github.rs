@@ -153,10 +153,17 @@ pub async fn search(
     query: Option<&str>,
     category: Option<&str>,
     page: u32,
+    order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
     let q = search_query(category, query);
+    // GitHub умеет сортировать по звёздам (популярность) и дате обновления.
+    let sort = match order {
+        Some("popularity") => "stars",
+        Some("updated") => "updated",
+        _ => "updated",
+    };
     let url = format!(
-        "{API}/search/repositories?q={q}&sort=updated&order=desc&per_page={PER_PAGE}&page={}",
+        "{API}/search/repositories?q={q}&sort={sort}&order=desc&per_page={PER_PAGE}&page={}",
         page.max(1)
     );
     let body = gh_get(client, &url).await?;
@@ -446,7 +453,7 @@ mod tests {
     #[ignore]
     async fn network_search_detail_resolve() {
         let client = crate::http::build_client().expect("http client");
-        let list = search(&client, None, None, 1).await.expect("search");
+        let list = search(&client, None, None, 1, None).await.expect("search");
         assert!(!list.items.is_empty(), "поиск по topic:beamng пуст");
         assert!(list.total_pages >= 1);
 

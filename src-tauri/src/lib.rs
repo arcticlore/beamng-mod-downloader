@@ -3,6 +3,7 @@ mod download;
 mod game;
 mod http;
 mod installer;
+mod ledger;
 mod models;
 mod sources;
 
@@ -11,7 +12,7 @@ use http::build_client;
 use log::{debug, error, info, warn};
 use models::{
     AppSettings, DownloadState, InstallRequest, InstalledMod, ModDetail, ModSearchResult,
-    ModsFolderCandidate, SourceCategory,
+    ModsFolderCandidate, ModUpdate, SourceCategory,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -104,11 +105,13 @@ async fn search_mods(
     query: Option<String>,
     category: Option<String>,
     page: u32,
+    order: Option<String>,
 ) -> Result<ModSearchResult, String> {
     let key = format!(
-        "{source}|{}|{}|{page}",
+        "{source}|{}|{}|{page}|{}",
         query.as_deref().unwrap_or(""),
-        category.as_deref().unwrap_or("")
+        category.as_deref().unwrap_or(""),
+        order.as_deref().unwrap_or("")
     );
 
     if let Ok(cache) = state.listing_cache.lock() {
@@ -126,6 +129,7 @@ async fn search_mods(
         query.as_deref(),
         category.as_deref(),
         page,
+        order.as_deref(),
     )
     .await
     .map_err(|e| {
@@ -197,7 +201,16 @@ fn list_installed(state: State<'_, AppState>) -> Result<Vec<InstalledMod>, Strin
         .mods_folder
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
-    installer::list_installed(&PathBuf::from(mods_folder)).map_err(|e| e.to_string())
+    let mut items = installer::list_installed(&PathBuf::from(mods_folder))
+        .map_err(|e| e.to_string())?;
+    let ledger = ledger::load();
+    for it in &mut items {
+        if let Some(e) = ledger.get(&it.filename) {
+            it.key = Some(e.key.clone());
+            it.published = e.published.clone();
+        }
+    }
+    Ok(items)
 }
 
 #[tauri::command]
@@ -210,7 +223,46 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
     let full = PathBuf::from(&mods_folder).join(&path);
-    installer::remove_file(&full.display().to_string()).map_err(|e| e.to_string())
+    installer::remove_file(&full.display().to_string()).map_err(|e| e.to_string())?;
+    ledger::remove(&path);
+    Ok(())
+}
+
+/// Проверяет установленные лаунчером моды на наличие обновлений:
+/// сравнивает дату публикации на источнике с той, что была при установке.
+#[tauri::command]
+async fn check_updates(
+    state: State<'_, AppState>,
+    items: Vec<InstalledMod>,
+) -> Result<Vec<ModUpdate>, String> {
+    let mut out = Vec::new();
+    for it in items {
+        let key = match &it.key {
+            Some(k) => k.clone(),
+            None => continue,
+        };
+        let filename = it.filename.clone();
+        let source = it.source.clone();
+        let installed = it.published.clone();
+        let latest = sources::detail(&state.client, &source, &filename, &key)
+            .await
+            .ok()
+            .and_then(|d| d.item.published);
+        let has_update = match (&installed, &latest) {
+            (Some(a), Some(b)) => a != b,
+            _ => false,
+        };
+        out.push(ModUpdate {
+            filename,
+            source,
+            key,
+            installed_published: installed,
+            latest_published: latest,
+            has_update,
+            error: None,
+        });
+    }
+    Ok(out)
 }
 
 #[tauri::command]
@@ -326,6 +378,7 @@ pub fn run() {
             get_downloads,
             list_installed,
             remove_installed,
+            check_updates,
             get_app_settings,
             set_app_settings,
             open_log_dir

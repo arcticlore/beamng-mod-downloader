@@ -29,6 +29,7 @@ export interface InstallRequest {
   modId: string;
   name: string;
   key: string;
+  published?: string | null;
 }
 
 export type DownloadState = {
@@ -48,6 +49,18 @@ export interface InstalledMod {
   sizeBytes: number;
   modified: number;
   source: string;
+  key?: string | null;
+  published?: string | null;
+}
+
+export interface ModUpdate {
+  filename: string;
+  source: string;
+  key: string;
+  installedPublished: string | null;
+  latestPublished: string | null;
+  hasUpdate: boolean;
+  error: string | null;
 }
 
 export interface SourceCategory {
@@ -125,4 +138,46 @@ export function formatSpeed(bps: number | null | undefined): string {
   if (bps < 1024) return `${Math.round(bps)} Б/с`;
   if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(1)} КБ/с`;
   return `${(bps / (1024 * 1024)).toFixed(1)} МБ/с`;
+}
+
+const STOPWORDS = new Set(["mod", "mods", "beamng", "drive", "the", "and", "for", "with", "new"]);
+
+export function tokenize(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of text.toLowerCase().split(/[^a-z0-9а-яё]+/)) {
+    if (raw.length < 2) continue;
+    if (raw.length >= 2 && raw.length <= 3 && /\d/.test(raw)) continue;
+    if (STOPWORDS.has(raw)) continue;
+    out.add(raw);
+  }
+  return out;
+}
+
+/** Схожесть двух наборов токенов (Jaccard): 1 = совпадают, 0 = нет общих. */
+export function similar(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+/**
+ * Ищет среди установленных архивов файл, который, скорее всего, и есть этот мод.
+ * Используется, чтобы не качать один и тот же мод дважды, когда он был
+ * установлен не через наш лаунчер (другое имя файла).
+ */
+export function findSimilarInstalled(
+  item: ModItem,
+  installed: { filename: string; path: string }[],
+): { filename: string; path: string } | null {
+  const nameTokens = tokenize(item.name);
+  if (nameTokens.size === 0) return null;
+  let best: { filename: string; path: string; score: number } | null = null;
+  for (const mod of installed) {
+    const fileTokens = tokenize(mod.filename.replace(/\.zip$/i, ""));
+    const score = similar(nameTokens, fileTokens);
+    if (score < 0.4) continue;
+    if (!best || score > best.score) best = { ...mod, score };
+  }
+  return best ? { filename: best.filename, path: best.path } : null;
 }

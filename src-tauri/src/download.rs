@@ -138,6 +138,9 @@ pub async fn start(
     let client = client.clone();
     let table = table.clone();
     let part_path = mods_dir.join(format!(".{filename}.part"));
+    let ledger_source = req.source.clone();
+    let ledger_name = req.name.clone();
+    let ledger_published = req.published.clone();
 
     tokio::spawn(async move {
         let job = DownloadJob {
@@ -159,6 +162,17 @@ pub async fn start(
                 let state = dl.to_state();
                 let _ = app.emit("download::finished", state);
                 info!("успешно: {filename} ({} байт)", dl.received);
+                crate::ledger::upsert(crate::ledger::LedgerEntry {
+                    filename: filename.clone(),
+                    source: ledger_source,
+                    key: task_key,
+                    name: ledger_name,
+                    installed_at: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                    published: ledger_published,
+                });
             }
             (Err(e), Some(mut dl)) => {
                 dl.phase = Phase::Error;

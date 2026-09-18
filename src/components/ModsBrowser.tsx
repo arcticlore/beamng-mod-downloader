@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCategories, searchMods } from "../api";
 import {
   BROWSER_SORTS,
+  findSimilarInstalled,
   installedFileName,
   type DownloadState,
   type ModItem,
@@ -10,6 +11,7 @@ import {
 import { ModCard } from "./ModCard";
 
 const AGGREGATE_SOURCES = ["worldofmods", "beamngweb", "github"];
+const AGG_DEPTH_MAX = 3;
 
 function dateOf(published: string | null): number {
   if (!published) return 0;
@@ -26,6 +28,7 @@ interface Props {
   source: string;
   downloads: Record<string, DownloadState>;
   installedNames: Set<string>;
+  installedList: { filename: string; path: string }[];
   cardSize: string;
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
@@ -35,6 +38,7 @@ export function ModsBrowser({
   source,
   downloads,
   installedNames,
+  installedList,
   cardSize,
   onInstall,
   onInfo,
@@ -49,6 +53,8 @@ export function ModsBrowser({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aggDepth, setAggDepth] = useState(1);
+  const [aggMore, setAggMore] = useState(false);
 
   useEffect(() => {
     getCategories(source).then(setCategories).catch(() => setCategories([]));
@@ -60,7 +66,14 @@ export function ModsBrowser({
   }, [query]);
 
   const load = useCallback(
-    async (src: string, cat: string, pg: number, q: string) => {
+    async (
+      src: string,
+      cat: string,
+      pg: number,
+      q: string,
+      ord: string,
+      depth: number,
+    ) => {
       setLoading(true);
       setError(null);
       try {
@@ -68,15 +81,30 @@ export function ModsBrowser({
           const merged: ModItem[] = [];
           const seen = new Set<string>();
           let anyOk = false;
+          let more = false;
           await Promise.all(
             AGGREGATE_SOURCES.map(async (s) => {
               try {
-                const res = await searchMods(s, q || null, null, 1);
-                anyOk = true;
-                for (const it of res.items) {
-                  if (!seen.has(it.id)) {
-                    seen.add(it.id);
-                    merged.push(it);
+                const pages = Math.max(1, Math.min(depth, AGG_DEPTH_MAX));
+                const res = await Promise.all(
+                  Array.from({ length: pages }, async (_, i) => {
+                    try {
+                      return await searchMods(s, q || null, null, i + 1);
+                    } catch (e) {
+                      console.warn(`источник ${s} (стр. ${i + 1}) недоступен:`, e);
+                      return null;
+                    }
+                  }),
+                );
+                for (const r of res) {
+                  if (!r) continue;
+                  anyOk = true;
+                  if (r.totalPages > 1) more = true;
+                  for (const it of r.items) {
+                    if (!seen.has(it.id)) {
+                      seen.add(it.id);
+                      merged.push(it);
+                    }
                   }
                 }
               } catch (e) {
@@ -86,9 +114,16 @@ export function ModsBrowser({
           );
           if (!anyOk) throw new Error("все источники сейчас недоступны");
           setItems(merged);
+          setAggMore(more);
           setTotalPages(1);
         } else {
-          const res = await searchMods(src, q || null, cat === "all" ? null : cat, pg);
+          const res = await searchMods(
+            src,
+            q || null,
+            cat === "all" ? null : cat,
+            pg,
+            ord,
+          );
           setItems(res.items);
           setTotalPages(res.totalPages || 1);
         }
@@ -104,11 +139,12 @@ export function ModsBrowser({
 
   useEffect(() => {
     setPage(1);
-  }, [source, category, debouncedQuery]);
+    setAggDepth(1);
+  }, [source, category, debouncedQuery, sort]);
 
   useEffect(() => {
-    load(source, category, page, debouncedQuery);
-  }, [source, category, page, debouncedQuery, load]);
+    load(source, category, page, debouncedQuery, sort, aggDepth);
+  }, [source, category, page, debouncedQuery, sort, aggDepth, load]);
 
   const visible = useMemo(() => {
     let list = items;
@@ -181,6 +217,11 @@ export function ModsBrowser({
             key={item.id}
             item={item}
             installed={installedNames.has(installedFileName(item))}
+            similar={
+              installedNames.has(installedFileName(item))
+                ? undefined
+                : findSimilarInstalled(item, installedList)
+            }
             dl={downloads[item.id]}
             onInstall={onInstall}
             onInfo={onInfo}
@@ -188,7 +229,22 @@ export function ModsBrowser({
         ))}
       </div>
 
-      {totalPages > 1 && (
+      {source === "all" && aggMore && (
+        <div className="pagination">
+          <button
+            className="btn"
+            disabled={aggDepth >= AGG_DEPTH_MAX}
+            onClick={() => setAggDepth((d) => Math.min(AGG_DEPTH_MAX, d + 1))}
+          >
+            Показать ещё
+          </button>
+          <span>
+            страниц в источнике: {aggDepth} / {AGG_DEPTH_MAX}
+          </span>
+        </div>
+      )}
+
+      {source !== "all" && totalPages > 1 && (
         <div className="pagination">
           <button
             className="btn"

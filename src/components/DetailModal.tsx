@@ -7,11 +7,12 @@ interface Props {
   item: ModItem;
   dl: DownloadState | undefined;
   installed: boolean;
+  similar?: { filename: string; path: string } | null;
   onInstall: (item: ModItem) => void;
   onClose: () => void;
 }
 
-export function DetailModal({ item, dl, installed, onInstall, onClose }: Props) {
+export function DetailModal({ item, dl, installed, similar, onInstall, onClose }: Props) {
   const [detail, setDetail] = useState<ModDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
@@ -62,10 +63,16 @@ export function DetailModal({ item, dl, installed, onInstall, onClose }: Props) 
               </div>
             )}
           </div>
-          <div className="modal-info">
-            <div className="mod-source">{SOURCES[item.source]?.label ?? item.source}</div>
-            <h2>{item.name}</h2>
-            {item.author && <div className="mod-meta">автор: {item.author}</div>}
+<div className="modal-info">
+              <div className="mod-source">{SOURCES[item.source]?.label ?? item.source}</div>
+              <h2>{item.name}</h2>
+              {!installed && similar && (
+                <div className="mod-warning">
+                  Похожий мод уже установлен как «{similar.filename}». Если это не обновление —
+                  установка создаст второй экземпляр мода.
+                </div>
+              )}
+              {item.author && <div className="mod-meta">автор: {item.author}</div>}
             {item.downloads && <div className="mod-meta">скачиваний: {item.downloads}</div>}
             {item.sizeBytes ? <div className="mod-meta">размер: {formatBytes(item.sizeBytes)}</div> : null}
             {item.published && <div className="mod-meta">дата: {item.published}</div>}

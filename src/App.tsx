@@ -3,10 +3,12 @@ import { listen } from "@tauri-apps/api/event";
 import { getDownloads, getModsFolder, getSettings, installMod, listInstalled } from "./api";
 import { applyAppearance } from "./theme";
 import { DetailModal } from "./components/DetailModal";
+import { DownloadsPanel } from "./components/DownloadsPanel";
 import { InstalledPanel } from "./components/InstalledPanel";
 import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
 import {
+  findSimilarInstalled,
   installedFileName,
   type AppSettings,
   type DownloadState,
@@ -14,13 +16,14 @@ import {
   type ModItem,
 } from "./types";
 
-type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "installed";
+type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "downloads" | "installed";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "Все" },
   { id: "worldofmods", label: "WorldOfMods" },
   { id: "beamngweb", label: "Официальный сайт" },
   { id: "github", label: "GitHub-релизы" },
+  { id: "downloads", label: "Загрузки" },
   { id: "installed", label: "Установленные" },
 ];
 
@@ -92,14 +95,31 @@ export default function App() {
     [installed],
   );
 
+  const installedList = useMemo(
+    () =>
+      installed.map((m) => ({
+        filename: m.filename,
+        path: m.path,
+      })),
+    [installed],
+  );
+
   const onInstall = useCallback(
     async (item: ModItem) => {
+      const similar = findSimilarInstalled(item, installedList);
+      if (similar && !installedNames.has(installedFileName(item))) {
+        const ok = window.confirm(
+          `Похоже, мод «${item.name}» уже установлен как файл «${similar.filename}». Скачать его ещё раз (возможно, это обновление или одноимённый мод)?`,
+        );
+        if (!ok) return;
+      }
       try {
         const key = await installMod({
           source: item.source,
           modId: item.id,
           name: item.name,
           key: item.key,
+          published: item.published,
         });
         setDownloads((prev) => ({
           ...prev,
@@ -119,7 +139,7 @@ export default function App() {
         showToast(String(e));
       }
     },
-    [showToast],
+    [showToast, installedList, installedNames],
   );
 
   return (
@@ -156,19 +176,33 @@ export default function App() {
       </nav>
 
       <main className="app-main">
-        {tab !== "installed" ? (
+        {tab === "downloads" ? (
+          <DownloadsPanel
+            downloads={downloads}
+            onClearFinished={() =>
+              setDownloads((prev) => {
+                const next: Record<string, DownloadState> = {};
+                for (const d of Object.values(prev)) {
+                  if (d.state === "downloading") next[d.key] = d;
+                }
+                return next;
+              })
+            }
+          />
+        ) : tab === "installed" ? (
+          <InstalledPanel
+            settings={settings}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        ) : (
           <ModsBrowser
             source={tab}
             downloads={downloads}
             installedNames={installedNames}
+            installedList={installedList}
             cardSize={settings?.cardSize ?? "normal"}
             onInstall={onInstall}
             onInfo={setDetailItem}
-          />
-        ) : (
-          <InstalledPanel
-            settings={settings}
-            onOpenSettings={() => setSettingsOpen(true)}
           />
         )}
       </main>
@@ -189,6 +223,11 @@ export default function App() {
           item={detailItem}
           dl={downloads[detailItem.id]}
           installed={installedNames.has(installedFileName(detailItem))}
+          similar={
+            installedNames.has(installedFileName(detailItem))
+              ? null
+              : findSimilarInstalled(detailItem, installedList)
+          }
           onInstall={onInstall}
           onClose={() => setDetailItem(null)}
         />

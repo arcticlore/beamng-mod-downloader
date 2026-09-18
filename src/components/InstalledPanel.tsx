@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
-import { listInstalled, removeInstalled } from "../api";
-import type { AppSettings, InstalledMod } from "../types";
+import { useEffect, useMemo, useState } from "react";
+import {
+  checkUpdates,
+  listInstalled,
+  removeInstalled,
+} from "../api";
+import type { AppSettings, InstalledMod, ModUpdate } from "../types";
 import { formatBytes } from "../types";
 
 export function InstalledPanel({
@@ -15,19 +19,53 @@ export function InstalledPanel({
   const [collapsed, setCollapsed] = useState(
     () => settings?.installedCollapsed ?? false,
   );
+  const [updates, setUpdates] = useState<Map<string, ModUpdate>>(new Map());
+  const [checking, setChecking] = useState(false);
 
   const refresh = () => {
     listInstalled()
-      .then(setItems)
+      .then((list) => {
+        setItems(list);
+        setError(null);
+      })
       .catch((e) => {
         setError(String(e));
         setItems([]);
       });
   };
 
+  const runUpdateCheck = async (list: InstalledMod[]) => {
+    const managed = list.filter((m) => m.key);
+    if (managed.length === 0) return;
+    setChecking(true);
+    try {
+      const res = await checkUpdates(managed);
+      setUpdates(new Map(res.map((u) => [u.filename, u])));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+
   useEffect(() => {
     refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (items && items.length > 0) runUpdateCheck(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  const managedCount = useMemo(
+    () => items?.filter((m) => m.key).length ?? 0,
+    [items],
+  );
+  const updateCount = useMemo(
+    () => [...updates.values()].filter((u) => u.hasUpdate).length,
+    [updates],
+  );
 
   if (error && items?.length === 0) {
     return (
@@ -64,10 +102,21 @@ export function InstalledPanel({
   return (
     <div className="installed">
       <div className="installed-summary">
-        Установлено архивов: {items.length} · всего {formatBytes(total)}
+        Архивов: {items.length} · {formatBytes(total)} · вручную:
+        {items.length - managedCount}
         <button className="btn btn-sm" onClick={() => setCollapsed((v) => !v)}>
           {collapsed ? "Развернуть" : "Свернуть"}
         </button>
+        {!collapsed && (
+          <button
+            className="btn btn-sm"
+            disabled={checking}
+            onClick={() => runUpdateCheck(items ?? [])}
+            title="Сравнить версии установленных модов с источниками"
+          >
+            {checking ? "Проверяю…" : updates.size ? `Обновления: ${updateCount}` : "Проверить обновления"}
+          </button>
+        )}
         {!collapsed && (
           <button className="btn btn-sm" onClick={refresh}>
             Обновить
@@ -82,37 +131,61 @@ export function InstalledPanel({
               <th>Источник</th>
               <th>Размер</th>
               <th>Изменён</th>
+              <th>Версия</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((m) => (
-              <tr key={m.path}>
-                <td title={m.path}>{m.filename}</td>
-                <td>
-                  <span className={`badge ${m.source === "repo" ? "badge-repo" : "badge-local"}`}>
-                    {m.source === "repo" ? "репо" : "локально"}
-                  </span>
-                </td>
-                <td>{formatBytes(m.sizeBytes)}</td>
-                <td>{new Date(m.modified * 1000).toLocaleDateString("ru-RU")}</td>
-                <td>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={async () => {
-                      try {
-                        await removeInstalled(m.filename);
-                        refresh();
-                      } catch (e) {
-                        alert(String(e));
-                      }
-                    }}
-                  >
-                    Удалить
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {sorted.map((m) => {
+              const up = updates.get(m.filename);
+              return (
+                <tr key={m.path}>
+                  <td title={m.path}>{m.filename}</td>
+                  <td>
+                    <span className={`badge ${m.source === "repo" ? "badge-repo" : "badge-local"}`}>
+                      {m.source === "repo" ? "репо" : m.key ? "лаунчер" : "вручную"}
+                    </span>
+                  </td>
+                  <td>{formatBytes(m.sizeBytes)}</td>
+                  <td>{new Date(m.modified * 1000).toLocaleDateString("ru-RU")}</td>
+                  <td>
+                    {m.key ? (
+                      up?.hasUpdate ? (
+                        <span className="badge badge-ok" title={`На сайте новее: ${up.latestPublished ?? "?"}`}>
+                          Есть обновление ↓
+                        </span>
+                      ) : (
+                        <span className="text-muted">
+                          {(up?.latestPublished ?? m.published)?.slice(0, 10) ?? "—"}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={async () => {
+                        try {
+                          await removeInstalled(m.filename);
+                          setUpdates((prev) => {
+                            const next = new Map(prev);
+                            next.delete(m.filename);
+                            return next;
+                          });
+                          refresh();
+                        } catch (e) {
+                          alert(String(e));
+                        }
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
