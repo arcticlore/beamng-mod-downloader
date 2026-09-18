@@ -89,15 +89,27 @@ build_app() {
     setup_rust
     setup_node
 
+    # Офлайн-сборка: push.sh вшивает в tarball готовый dist/ и vendor/ (cargo).
+    # В сетевом окружении (локально, без vendor/) собираем фронтенд сами.
+    local OFFLINE=0
+    [ -d "$ROOT/vendor" ] && [ -f "$ROOT/.cargo/config.toml" ] && OFFLINE=1
+    [ -f "$ROOT/dist/index.html" ] && log "dist/ уже есть в tarball — npm ci/vite пропускаю" \
+        || {
     log "npm ci"
     npm ci --no-audit --no-fund
 
     log "vite build (dist/)"
     npm run build
+    }
 
     log "cargo build --release"
     export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
-    cargo build --release --manifest-path "$ROOT/src-tauri/Cargo.toml"
+    if [ "$OFFLINE" = 1 ]; then
+        log "vendor/ найден — собираю офлайн"
+        cargo build --release --offline --manifest-path "$ROOT/src-tauri/Cargo.toml"
+    else
+        cargo build --release --manifest-path "$ROOT/src-tauri/Cargo.toml"
+    fi
     [ -x "$ROOT/src-tauri/target/release/$APP" ] || die "бинарник $APP не собран"
 
     log "staging -> $PKG_ROOT"

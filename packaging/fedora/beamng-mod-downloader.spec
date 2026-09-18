@@ -21,6 +21,7 @@ BuildRequires:  nodejs
 %if 0%{?fedora}
 BuildRequires:  webkit2gtk4.1-devel
 BuildRequires:  pkgconfig(ayatana-appindicator3-0.1)
+BuildRequires:  npm
 %else
 BuildRequires:  typelib-1_0-JavaScriptCore-4_1
 BuildRequires:  typelib-1_0-WebKit2-4_1

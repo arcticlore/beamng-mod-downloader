@@ -46,11 +46,30 @@ EOF
     osc -A "$API" api -X PUT -f "$P" "/source/$PROJECT/$PACKAGE/_meta" >/dev/null
 fi
 
-# --- tarball из git ---------------------------------------------------------
+# --- tarball из git + dist/ + vendor/ (офлайн-сборка на OBS) ---------------
 TAR="$PACKAGE-$VERSION.tar.xz"
-log "собираю $TAR (git archive @ HEAD)"
-git -C "$HERE" archive --format=tar \
-    --prefix="$PACKAGE-$VERSION/" HEAD | xz -9c > "$STAGE/$TAR"
+log "собираю $TAR (git archive + dist/ + vendor/)"
+SRC="$STAGE/$PACKAGE-$VERSION"
+mkdir -p "$SRC"
+git -C "$HERE" archive HEAD | tar -x -C "$SRC"
+
+log "  vite (dist/)"
+(cd "$SRC" && npm ci --no-audit --no-fund && npm run build)
+
+log "  cargo vendor"
+(cd "$SRC" && cargo vendor --locked vendor >/dev/null)
+
+cat > "$SRC/.cargo/config.toml" <<'EOF'
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+EOF
+
+tar -cJf "$STAGE/$TAR" -C "$STAGE" \
+    --exclude="$PACKAGE-$VERSION/node_modules" \
+    "$PACKAGE-$VERSION"
 [ -s "$STAGE/$TAR" ] || die "git archive не дал результата"
 
 # --- шаблоны с версией ------------------------------------------------------
