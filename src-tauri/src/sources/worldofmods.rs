@@ -465,6 +465,9 @@ mod tests {
             published_from_page(&doc).as_deref(),
             Some("2016-04-06T04:08:50-04:00")
         );
-        assert_eq!(published_from_page(&Html::parse_document("<html></html>")), None);
+        assert_eq!(
+            published_from_page(&Html::parse_document("<html></html>")),
+            None
+        );
     }
 }

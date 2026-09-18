@@ -473,7 +473,10 @@ mod tests {
 
     #[test]
     fn listing_url_formats() {
-        assert_eq!(listing_url("all", 1, ""), "https://www.beamng.com/resources/");
+        assert_eq!(
+            listing_url("all", 1, ""),
+            "https://www.beamng.com/resources/"
+        );
         assert_eq!(
             listing_url("all", 2, ""),
             "https://www.beamng.com/resources/?page=2"

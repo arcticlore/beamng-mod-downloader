@@ -97,9 +97,10 @@ pub async fn start(
         .await
         .with_context(|| format!("не удалось создать {}", mods_dir.display()))?;
 
-    let (url, filename, source_published) = sources::resolve_download(client, &req.source, &req.key)
-        .await
-        .map_err(|e| anyhow!("{e}"))?;
+    let (url, filename, source_published) =
+        sources::resolve_download(client, &req.source, &req.key)
+            .await
+            .map_err(|e| anyhow!("{e}"))?;
     info!("resolve: source={} url={url} → {filename}", req.source);
 
     // Если файл уже установлен (есть в папке модов) — не перезаписываем архив,

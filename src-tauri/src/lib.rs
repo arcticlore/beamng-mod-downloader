@@ -12,7 +12,7 @@ use http::build_client;
 use log::{debug, error, info, warn};
 use models::{
     AppSettings, DownloadState, InstallRequest, InstalledMod, ModDetail, ModSearchResult,
-    ModsFolderCandidate, ModUpdate, SourceCategory,
+    ModUpdate, ModsFolderCandidate, SourceCategory,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -215,8 +215,8 @@ fn list_installed(state: State<'_, AppState>) -> Result<Vec<InstalledMod>, Strin
         .mods_folder
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
-    let mut items = installer::list_installed(&PathBuf::from(mods_folder))
-        .map_err(|e| e.to_string())?;
+    let mut items =
+        installer::list_installed(&PathBuf::from(mods_folder)).map_err(|e| e.to_string())?;
     let ledger = ledger::load();
     for it in &mut items {
         if let Some(e) = ledger.get(&it.filename) {
@@ -241,9 +241,14 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
     // пути без `..`, которые могут прийти из сканирования файловой системы.
     let rel = PathBuf::from(&path);
     if rel.is_absolute()
-        || rel
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_) | std::path::Component::RootDir))
+        || rel.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir
+                    | std::path::Component::Prefix(_)
+                    | std::path::Component::RootDir
+            )
+        })
     {
         return Err("недопустимый путь для удаления".to_string());
     }

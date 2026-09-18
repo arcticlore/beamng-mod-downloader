@@ -44,8 +44,7 @@ pub fn save(entries: &HashMap<String, LedgerEntry>) -> Result<()> {
     let mut list: Vec<&LedgerEntry> = entries.values().collect();
     list.sort_by(|a, b| a.filename.cmp(&b.filename));
     let raw = serde_json::to_string_pretty(&list)?;
-    std::fs::write(&path, raw)
-        .with_context(|| format!("не удалось записать {}", path.display()))
+    std::fs::write(&path, raw).with_context(|| format!("не удалось записать {}", path.display()))
 }
 
 pub fn upsert(entry: LedgerEntry) {
