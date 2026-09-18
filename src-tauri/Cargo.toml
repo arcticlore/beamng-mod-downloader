@@ -3,6 +3,7 @@ name = "beamng-mod-downloader"
 version = "0.1.1"
 description = "Кроссплатформенный установщик модов для BeamNG.drive"
 edition = "2021"
+rust-version = "1.88.0"
 
 [lib]
 name = "beamng_mod_downloader_lib"

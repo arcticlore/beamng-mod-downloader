@@ -17,7 +17,7 @@
 set -euo pipefail
 
 APP="beamng-mod-downloader"
-MIN_RUST="1.77.2"        # MSRV Tauri 2
+MIN_RUST="1.88.0"        # MSRV 1.88: требование дерева зависимостей (tauri 2.11)
 MIN_NODE_MAJOR="18"      # vite 6
 NODE_LTS_POINT="latest-v20.x"
 
