@@ -87,20 +87,21 @@ setup_node() {
 build_app() {
     cd "$ROOT"
     setup_rust
-    setup_node
 
-    # Офлайн-сборка: push.sh вшивает в tarball готовый dist/ и vendor/ (cargo).
-    # В сетевом окружении (локально, без vendor/) собираем фронтенд сами.
+    # Тарбол из push.sh уже содержит собранный dist/ и vendor/ (cargo).
+    # Наличие dist/ избавляет от node/npm и сети; vendor/ — от crates.io.
     local OFFLINE=0
     [ -d "$ROOT/vendor" ] && [ -f "$ROOT/.cargo/config.toml" ] && OFFLINE=1
-    [ -f "$ROOT/dist/index.html" ] && log "dist/ уже есть в tarball — npm ci/vite пропускаю" \
-        || {
-    log "npm ci"
-    npm ci --no-audit --no-fund
 
-    log "vite build (dist/)"
-    npm run build
-    }
+    if [ -f "$ROOT/dist/index.html" ]; then
+        log "dist/ уже есть в tarball — npm/vite пропускаю"
+    else
+        setup_node
+        log "npm ci"
+        npm ci --no-audit --no-fund
+        log "vite build (dist/)"
+        npm run build
+    fi
 
     log "cargo build --release"
     export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
