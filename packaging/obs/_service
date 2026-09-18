@@ -1,5 +1,5 @@
 <services>
-  <service name="tar_git" mode="buildtime">
+  <service name="tar_git">
     <param name="url">https://github.com/arcticlore/beamng-mod-downloader.git</param>
     <param name="branch">main</param>
     <param name="filename">beamng-mod-downloader</param>

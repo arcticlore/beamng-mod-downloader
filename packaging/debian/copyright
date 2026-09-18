@@ -1,8 +1,0 @@
-Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: beamng-mod-downloader
-Source: https://github.com/arcticlore/beamng-mod-downloader
-
-Files: *
-Copyright: 2026 arcticlore
-License: MIT
- См. полный текст в LICENSE в корне репозитория.

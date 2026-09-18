@@ -10,8 +10,14 @@ Source0:        %{name}-%{version}.tar.xz
 
 BuildRequires:  gcc-c++
 
-# Пакеты дистрибутива (rpm-цели OBS). rust/nodejs не обязательны в
-# BuildRequires: obs-build.sh сам приведёт тулчейн к рабочему состоянию.
+# Тулчейн дистрибутива, где он достаточно свежий (Fedora, openSUSE).
+# obs-build.sh использует системный cargo/node, если версия >= MSRV,
+# иначе ставит свежие в $HOME (требует сети в билд-окружении).
+%if 0%{?fedora} || 0%{?suse_version}
+BuildRequires:  cargo
+BuildRequires:  rust
+BuildRequires:  nodejs
+%endif
 %if 0%{?fedora}
 BuildRequires:  webkit2gtk4.1-devel
 BuildRequires:  pkgconfig(ayatana-appindicator3-0.1)
