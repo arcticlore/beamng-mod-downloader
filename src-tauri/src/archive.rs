@@ -84,7 +84,7 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
         .iter()
         .rposition(|b| *b == 0x50)
         .and_then(|i| {
-            if i + 4 <= tail.len() && &tail[i..i + 4] == &EOCD_SIG {
+            if i + 4 <= tail.len() && tail[i..i + 4] == EOCD_SIG {
                 Some(i)
             } else {
                 None
@@ -133,7 +133,7 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
         if pos + 46 > cd_len {
             return Err(anyhow!("запись {} обрывается в каталоге", i + 1));
         }
-        if &cd[pos..pos + 4] != &CD_SIG {
+        if cd[pos..pos + 4] != CD_SIG {
             return Err(anyhow!("битая сигнатура записи {} в каталоге", i + 1));
         }
         let name_len = rd_u16(&cd, pos + 28) as usize;
@@ -159,7 +159,7 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
         f.read_exact(&mut lfh).with_context(|| {
             format!("не удалось прочитать локальный заголовок записи {}", i + 1)
         })?;
-        if &lfh[0..4] != &LFH_SIG {
+        if lfh[0..4] != LFH_SIG {
             return Err(anyhow!(
                 "запись {}: неверная сигнатура локального заголовка",
                 i + 1
@@ -230,7 +230,7 @@ mod tests {
         out.extend_from_slice(&0_u16.to_le_bytes());
         out.extend_from_slice(name.as_bytes());
         out.extend_from_slice(data);
-        let local_off = (out.len() - name.len() - data.len()) as u32;
+        let local_off = 0_u32; // единственный локальный заголовок — в начале
         // Central directory
         let cd_start = out.len() as u32;
         out.extend_from_slice(&CD_SIG);

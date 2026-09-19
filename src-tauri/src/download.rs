@@ -98,6 +98,7 @@ async fn cleanup_part(part: &Path) {
 /// Скачивает поток в `.part`-файл, считая при этом SHA-256, и проверяет
 /// полученный архив структурно (EOCD + центральный каталог). Возвращает
 /// hex-SHA256 и число полученных байт. При любой ошибке `.part` удаляется.
+#[allow(clippy::too_many_arguments)]
 async fn stream_to_part(
     client: &reqwest::Client,
     app: &tauri::AppHandle,
@@ -209,7 +210,7 @@ async fn stream_to_part(
 
     // Структурная проверка zip: защита от усечённых/повреждённых архивов.
     crate::archive::validate_zip(part).map_err(|e| {
-        cleanup_part(part);
+        let _ = std::fs::remove_file(part);
         anyhow!("архив не прошёл проверку целостности: {e}")
     })?;
 
