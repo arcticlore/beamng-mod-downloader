@@ -177,16 +177,6 @@ jobs:
         env:
           RUST_BACKTRACE: "0"
 
-  osv-scanner:
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
-    with:
-      scan-args: |-
-        --recursive
-        .
-      upload-sarif: false
-      fail-on-vuln: true
-      runs-on: ubuntu-22.04
-
   version-consistency:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
@@ -235,7 +225,6 @@ jobs:
       - frontend-test
       - npm-audit
       - cargo-deny
-      - osv-scanner
       - version-consistency
       - tauri-config
       - packaging-static

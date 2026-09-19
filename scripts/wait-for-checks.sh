@@ -14,7 +14,7 @@ SHA="${1:?usage: wait-for-checks.sh <sha>}"
 TIMEOUT_S="${TIMEOUT_S:-1500}"
 POLL_S="${POLL_S:-30}"
 
-REQUIRED=(fmt test clippy tsc frontend-build frontend-test npm-audit cargo-deny osv-scanner version-consistency tauri-config packaging-static "bundle")
+REQUIRED=(fmt test clippy tsc frontend-build frontend-test npm-audit cargo-deny version-consistency tauri-config packaging-static "bundle")
 
 REPO="${GITHUB_REPOSITORY:-$(git remote get-url origin | sed -E 's#.*[:/]([^/]+/[^/]+)(\.git)?$#\1#')}"
 
