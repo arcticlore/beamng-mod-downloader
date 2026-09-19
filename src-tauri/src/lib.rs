@@ -1,3 +1,4 @@
+mod archive;
 mod config;
 mod download;
 mod game;
@@ -6,13 +7,14 @@ mod installer;
 mod ledger;
 mod models;
 mod sources;
+mod urlguard;
 
 use config::Config;
 use http::build_client;
 use log::{debug, error, info, warn};
 use models::{
-    AppSettings, DownloadState, InstallRequest, InstalledMod, ModDetail, ModSearchResult,
-    ModUpdate, ModsFolderCandidate, SourceCategory,
+    AppSettings, DownloadState, InstallRequest, InstalledMod, IntegrityReport, ModDetail,
+    ModSearchResult, ModUpdate, ModsFolderCandidate, SourceCategory,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,6 +32,7 @@ pub struct AppState {
     pub client: reqwest::Client,
     pub config: Mutex<Config>,
     pub downloads: download::DownloadTable,
+    pub cancels: download::CancelTable,
     pub listing_cache: Arc<Mutex<HashMap<String, (Instant, ModSearchResult)>>>,
 }
 
@@ -196,9 +199,101 @@ async fn install_mod(
         .mods_folder
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
-    download::start(&app, &state.client, &state.downloads, &mods_folder, req)
-        .await
-        .map_err(|e| e.to_string())
+    download::start(
+        &app,
+        &state.client,
+        &state.downloads,
+        &state.cancels,
+        &mods_folder,
+        req,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cancel_download(state: State<'_, AppState>, key: String) -> Result<(), String> {
+    download::cancel(&state.cancels, &key).map_err(|e| e.to_string())
+}
+
+/// Обновляет один установленный лаунчером мод до актуальной версии с источника.
+#[tauri::command]
+async fn update_mod(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    filename: String,
+) -> Result<String, String> {
+    info!("обновление мода: {filename}");
+    let mods_folder = state
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .mods_folder
+        .clone()
+        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+    download::update(
+        &app,
+        &state.client,
+        &state.downloads,
+        &state.cancels,
+        &mods_folder,
+        &filename,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Проверяет целостность установленных архивов: структурную валидность zip
+/// и совпадение SHA-256 с записью ledger для модов, установленных лаунчером.
+#[tauri::command]
+async fn verify_installed(state: State<'_, AppState>) -> Result<Vec<IntegrityReport>, String> {
+    let mods_folder = state
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .mods_folder
+        .clone()
+        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+    let list =
+        installer::list_installed(&PathBuf::from(&mods_folder)).map_err(|e| e.to_string())?;
+    let ledger = ledger::load();
+    tokio::task::spawn_blocking(move || {
+        let mut reports: Vec<IntegrityReport> = Vec::with_capacity(list.len());
+        for it in list {
+            let path = PathBuf::from(&it.path);
+            let (zip_ok, entries, sha256) = match archive::validate_zip(&path) {
+                Ok(summary) => (true, summary.entries, archive::sha256_file(&path).ok()),
+                Err(_) => (false, 0, None),
+            };
+            let tracked = ledger.get(&it.filename).and_then(|e| e.sha256.clone());
+            let hash_ok = if zip_ok {
+                match (&sha256, &tracked) {
+                    (Some(a), Some(b)) => Some(a == b),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            reports.push(IntegrityReport {
+                filename: it.filename.clone(),
+                size_bytes: it.size_bytes,
+                zip_ok,
+                entries,
+                sha256,
+                tracked_sha256: tracked,
+                hash_ok,
+                error: if zip_ok {
+                    None
+                } else {
+                    Some("архив повреждён или усечён".to_string())
+                },
+            });
+        }
+        reports.sort_by(|a, b| a.filename.cmp(&b.filename));
+        reports
+    })
+    .await
+    .map_err(|e| format!("проверка целостности прервана: {e}"))
 }
 
 #[tauri::command]
@@ -401,6 +496,7 @@ pub fn run() {
                 client,
                 config: Mutex::new(Config::load()),
                 downloads: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+                cancels: Arc::new(std::sync::Mutex::new(HashMap::new())),
                 listing_cache: Arc::new(Mutex::new(HashMap::new())),
             };
             app.manage(state);
@@ -422,6 +518,9 @@ pub fn run() {
             get_categories,
             install_mod,
             get_downloads,
+            cancel_download,
+            update_mod,
+            verify_installed,
             list_installed,
             remove_installed,
             check_updates,

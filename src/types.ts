@@ -63,6 +63,18 @@ export interface ModUpdate {
   error: string | null;
 }
 
+export interface IntegrityReport {
+  filename: string;
+  sizeBytes: number;
+  zipOk: boolean;
+  entries: number;
+  sha256: string | null;
+  trackedSha256: string | null;
+  /** null — неизвестно (нет записи в ledger); false — файл изменён после установки. */
+  hashOk: boolean | null;
+  error: string | null;
+}
+
 export interface SourceCategory {
   id: string;
   label: string;

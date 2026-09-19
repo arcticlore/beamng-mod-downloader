@@ -1,8 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main window",
+  "description": "Основное окно: только локальные команды приложения (внутренний IPC), без shell/fs/http/process/opener",
   "windows": ["main"],
+  "local": true,
   "permissions": [
     "core:default",
     "log:default"

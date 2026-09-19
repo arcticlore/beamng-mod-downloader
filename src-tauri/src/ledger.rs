@@ -14,6 +14,8 @@ pub struct LedgerEntry {
     pub name: String,
     pub installed_at: u64,
     pub published: Option<String>,
+    /// SHA-256 архива, посчитанный при установке (для verify_installed).
+    pub sha256: Option<String>,
 }
 
 pub fn ledger_path() -> Result<PathBuf> {
