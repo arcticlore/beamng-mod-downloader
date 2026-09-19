@@ -159,7 +159,7 @@ jobs:
 
   cargo-deny:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
         with:
@@ -170,10 +170,11 @@ jobs:
       - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.7.3
         with:
           workspaces: "./src-tauri -> target"
-      - uses: embarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
-        with:
-          command: check
-          arguments: --all-features
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny --version 0.20.2
+      - name: cargo deny check
+        working-directory: src-tauri
+        run: cargo deny --config ../deny.toml --manifest-path ./Cargo.toml --all-features check
         env:
           RUST_BACKTRACE: "0"
 

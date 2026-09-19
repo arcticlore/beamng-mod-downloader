@@ -8,7 +8,7 @@ import {
   similar,
   findSimilarInstalled,
   installedFileName,
-} from "../src/types.ts";
+} from "../../src/types.ts";
 
 test("formatBytes: размеры", () => {
   assert.equal(formatBytes(null), "");
