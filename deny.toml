@@ -9,9 +9,47 @@ db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "warn"
 
-# Исключения добавляются ТОЛЬКО с owner, причиной и сроком expiry (см. §11 промта).
-# [[advisories.ignore]]
-# id = "RUSTSEC-0000-0000"
+# Исключения добавлены для ИНФОРМАЦИОННЫХ advisories типа "unmaintained"
+# (не уязвимости), транзитивно навязанных актуальным стеком tauri/gtk-rs:
+#   - proc-macro-error  -> glib-macros/gtk3-macros 0.18.x (gtk-rs ecosystem)
+#   - fxhash            -> transitive via tauri toolchain
+#   - unic-*            -> urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5)
+# Верхнеуровневой зависимости нет; real-fix возможен только апгрейдом tauri/gtk-rs.
+# Все записи имеют владельца (arcticlore), причину и дату повторной оценки.
+[[advisories.ignore]]
+id = "RUSTSEC-2024-0370" # proc-macro-error: unmaintained
+reason = "unmaintained-only, transitive via glib-macros/gtk3-macros 0.18.x (gtk-rs 0.18); informational, no vulnerability; re-eval on gtk-rs upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0057" # fxhash: no longer maintained
+reason = "unmaintained-only, transitive via tauri toolchain; informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0075" # unic-char-range
+reason = "unmaintained-only, transitive via urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5); informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0080" # unic-common
+reason = "unmaintained-only, transitive via urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5); informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0081" # unic-char-property
+reason = "unmaintained-only, transitive via urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5); informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0098" # unic-ucd-version
+reason = "unmaintained-only, transitive via urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5); informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0100" # unic-ucd-ident
+reason = "unmaintained-only, transitive via urlpattern 0.3.0 -> tauri-utils 2.9.3 (tauri 2.11.5); informational, no vulnerability; re-eval on tauri upgrade"
+expires = "2026-12-31"
 
 [licenses]
 version = 2
@@ -22,7 +60,8 @@ allow = [
   "BSD-3-Clause",
   "ISC",
   "Zlib",
-  "Unicode-DFS-2016",
+  "Unicode-3.0",
+  "CDLA-Permissive-2.0",
   "CC0-1.0",
   "MPL-2.0",
 ]
