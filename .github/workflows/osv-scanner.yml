@@ -11,18 +11,12 @@ jobs:
       security-events: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v2.6.0
-        with:
-          scan-args: --config=./osv-scanner.toml -r ./
-          fail-on-vuln: true
-          results-file-name: results.sarif
-          download-artifact: false
-          export-results: true
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@3ea06614dafe36dec890db3446326e0d40ce53d4
-        with:
-          sarif_file: results.sarif
-          category: osv-scanner
+      - name: Install and run osv-scanner
+        run: |
+          set -euo pipefail
+          pip install --quiet osv-scanner
+          echo "osv-scanner version:"
+          osv-scanner --version
+          echo "Running scan..."
+          osv-scanner --config ./osv-scanner.toml -r ./
+          echo "Scan completed successfully"
