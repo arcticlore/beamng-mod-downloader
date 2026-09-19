@@ -78,6 +78,7 @@ fn search_query(category: Option<&str>, query: Option<&str>) -> String {
 }
 
 async fn gh_get(client: &reqwest::Client, url: &str) -> Result<String, SourceError> {
+    crate::urlguard::validate_url(url).map_err(|e| SourceError::Network(format!("SSRF-gate: {e}")))?;
     let resp = client
         .get(url)
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
