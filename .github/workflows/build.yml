@@ -157,7 +157,16 @@ jobs:
       - name: npm ci
         run: npm ci
       - name: npm audit (severity >= high)
-        run: npm audit --audit-level=high
+        run: |
+          # Registry flags/bulk-endpoint can 503 during maintenance; retry before failing.
+          for i in 1 2 3; do
+            if npm audit --audit-level=high; then
+              exit 0
+            fi
+            echo "npm audit attempt ${i}/3 failed (transient registry error); retrying in 30s..."
+            sleep 30
+          done
+          exit 1
 
   cargo-deny:
     runs-on: ubuntu-22.04
