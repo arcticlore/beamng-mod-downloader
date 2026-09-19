@@ -3,9 +3,25 @@ import {
   checkUpdates,
   listInstalled,
   removeInstalled,
+  updateMod,
+  verifyInstalled,
 } from "../api";
-import type { AppSettings, InstalledMod, ModUpdate } from "../types";
+import type { AppSettings, InstalledMod, IntegrityReport, ModUpdate } from "../types";
 import { formatBytes } from "../types";
+
+function IntegrityBadge({ report }: { report: IntegrityReport }) {
+  const bad = !report.zipOk || report.hashOk === false;
+  const title = bad
+    ? report.hashOk === false
+      ? "Файл изменён или заменён после установки лаунчером"
+      : report.error ?? "Архив повреждён или усечён"
+    : "Целостность подтверждена";
+  return (
+    <span className={`badge ${bad ? "badge-error" : "badge-ok"}`} title={title}>
+      {bad ? "Целостность нарушена" : "OK"}
+    </span>
+  );
+}
 
 export function InstalledPanel({
   onOpenSettings,
@@ -21,6 +37,9 @@ export function InstalledPanel({
   );
   const [updates, setUpdates] = useState<Map<string, ModUpdate>>(new Map());
   const [checking, setChecking] = useState(false);
+  const [integrity, setIntegrity] = useState<Map<string, IntegrityReport> | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [updating, setUpdating] = useState<Set<string>>(new Set());
 
   const refresh = () => {
     listInstalled()
@@ -32,6 +51,35 @@ export function InstalledPanel({
         setError(String(e));
         setItems([]);
       });
+  };
+
+  const runIntegrity = async () => {
+    setVerifying(true);
+    try {
+      const res = await verifyInstalled();
+      setIntegrity(new Map(res.map((r) => [r.filename, r])));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const doUpdate = async (m: InstalledMod) => {
+    setUpdating((prev) => new Set(prev).add(m.filename));
+    try {
+      await updateMod(m.filename);
+    } catch (e) {
+      alert(String(e));
+    } finally {
+      setUpdating((prev) => {
+        const next = new Set(prev);
+        next.delete(m.filename);
+        return next;
+      });
+    }
+    // Событие download::finished приходит асинхронно — даём файлу замениться.
+    window.setTimeout(refresh, 3000);
   };
 
   const runUpdateCheck = async (list: InstalledMod[]) => {
@@ -66,6 +114,14 @@ export function InstalledPanel({
     () => [...updates.values()].filter((u) => u.hasUpdate).length,
     [updates],
   );
+  let integritySummary: string | null = null;
+  if (integrity) {
+    const list = [...integrity.values()];
+    const fine = list.filter(
+      (r) => r.zipOk && (r.hashOk === true || r.hashOk == null),
+    ).length;
+    integritySummary = `Целостность: ${fine}/${list.length}`;
+  }
 
   if (error && items?.length === 0) {
     return (
@@ -104,6 +160,7 @@ export function InstalledPanel({
       <div className="installed-summary">
         Архивов: {items.length} · {formatBytes(total)} · вручную:
         {items.length - managedCount}
+        {integritySummary && <span className="text-muted"> · {integritySummary}</span>}
         <button className="btn btn-sm" onClick={() => setCollapsed((v) => !v)}>
           {collapsed ? "Развернуть" : "Свернуть"}
         </button>
@@ -115,6 +172,16 @@ export function InstalledPanel({
             title="Сравнить версии установленных модов с источниками"
           >
             {checking ? "Проверяю…" : updates.size ? `Обновления: ${updateCount}` : "Проверить обновления"}
+          </button>
+        )}
+        {!collapsed && (
+          <button
+            className="btn btn-sm"
+            disabled={verifying}
+            onClick={runIntegrity}
+            title="Проверить zip-структуру и SHA-256 установленных архивов"
+          >
+            {verifying ? "Проверяю…" : "Проверить целостность"}
           </button>
         )}
         {!collapsed && (
@@ -162,8 +229,20 @@ export function InstalledPanel({
                     ) : (
                       <span className="text-muted">—</span>
                     )}
+                    {integrity?.get(m.filename) && (
+                      <IntegrityBadge report={integrity.get(m.filename)!} />
+                    )}
                   </td>
                   <td>
+                    {m.key && up?.hasUpdate && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={updating.has(m.filename)}
+                        onClick={() => doUpdate(m)}
+                      >
+                        {updating.has(m.filename) ? "Обновляю…" : "Обновить"}
+                      </button>
+                    )}
                     <button
                       className="btn btn-danger btn-sm"
                       onClick={async () => {

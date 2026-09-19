@@ -70,6 +70,24 @@ pub struct InstalledMod {
     pub published: Option<String>,
 }
 
+/// Результат проверки целостности одного установленного архива.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrityReport {
+    pub filename: String,
+    pub size_bytes: u64,
+    /// Прошёл ли архив структурную zip-проверку.
+    pub zip_ok: bool,
+    pub entries: usize,
+    /// Текущий SHA-256 файла.
+    pub sha256: Option<String>,
+    /// SHA-256, сохранённый в ledger при установке.
+    pub tracked_sha256: Option<String>,
+    /// Some(true) — совпадает; Some(false) — файл изменён/заменён после установки.
+    pub hash_ok: Option<bool>,
+    pub error: Option<String>,
+}
+
 /// Результат проверки обновления одного установленного мода.
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

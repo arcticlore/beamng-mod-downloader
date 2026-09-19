@@ -5,6 +5,7 @@ import type {
   DownloadState,
   InstallRequest,
   InstalledMod,
+  IntegrityReport,
   ModDetail,
   ModSearchResult,
   ModsFolderCandidate,
@@ -57,6 +58,12 @@ export const getCategories = (source: string) => call<SourceCategory[]>("get_cat
 export const installMod = (req: InstallRequest) => call<string>("install_mod", { req });
 
 export const getDownloads = () => call<DownloadState[]>("get_downloads");
+
+export const cancelDownload = (key: string) => call<void>("cancel_download", { key });
+
+export const updateMod = (filename: string) => call<string>("update_mod", { filename });
+
+export const verifyInstalled = () => call<IntegrityReport[]>("verify_installed");
 
 export const listInstalled = () => call<InstalledMod[]>("list_installed");
 

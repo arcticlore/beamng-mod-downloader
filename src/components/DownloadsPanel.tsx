@@ -6,6 +6,7 @@ import { ProgressBar } from "./ProgressBar";
 interface Props {
   downloads: Record<string, DownloadState>;
   onClearFinished: () => void;
+  onCancel: (key: string) => void;
 }
 
 function formatEta(remaining: number, speedBps: number): string | null {
@@ -18,7 +19,7 @@ function formatEta(remaining: number, speedBps: number): string | null {
 
 const ACTIVE_ONLY = ["downloading", "error"];
 
-export function DownloadsPanel({ downloads, onClearFinished }: Props) {
+export function DownloadsPanel({ downloads, onClearFinished, onCancel }: Props) {
   const list = useMemo(() => {
     return Object.values(downloads).sort(
       (a, b) => ACTIVE_ONLY.indexOf(a.state) - ACTIVE_ONLY.indexOf(b.state),
@@ -82,6 +83,11 @@ export function DownloadsPanel({ downloads, onClearFinished }: Props) {
               )}
               {d.state === "downloading" && (
                 <span className="download-speed">{formatSpeed(d.speedBps)}</span>
+              )}
+              {d.state === "downloading" && (
+                <button className="btn btn-sm btn-danger" onClick={() => onCancel(d.key)}>
+                  Отмена
+                </button>
               )}
               {d.state === "done" && (
                 <span className="badge badge-ok">Готово</span>
