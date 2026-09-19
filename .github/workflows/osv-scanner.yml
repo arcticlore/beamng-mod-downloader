@@ -11,10 +11,11 @@ jobs:
       security-events: write
       id-token: write
     steps:
+      - uses: actions/checkout@v4
       - name: Install and run osv-scanner
         run: |
           set -euo pipefail
-          pip install --quiet osv-scanner
+          curl -sSfL https://osv.dev/install.sh | sh -s -- -b /usr/local/bin
           echo "osv-scanner version:"
           osv-scanner --version
           echo "Running scan..."
