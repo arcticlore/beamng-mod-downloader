@@ -6,6 +6,7 @@ mod installer;
 mod ledger;
 mod models;
 mod sources;
+mod urlguard;
 
 use config::Config;
 use http::build_client;
