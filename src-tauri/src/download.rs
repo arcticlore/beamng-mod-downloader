@@ -467,6 +467,8 @@ pub async fn update(
 
     let key = format!("update:{filename}");
     ensure_capacity(table, &key, &latest_filename).await?;
+    // for 'static spawn task
+    let filename_owned = filename.to_string();
 
     let part_path = mods_dir.join(format!(".{latest_filename}.new.part"));
     let mod_name = if entry.name.is_empty() {
@@ -526,8 +528,8 @@ pub async fn update(
             (Ok((hex, _bytes)), Some(mut dl)) => {
                 let target = mods_dir.join(&latest_filename);
                 // Заменяем старый архив (обновление может сменить имя файла).
-                if latest_filename != filename {
-                    let _ = tokio::fs::remove_file(mods_dir.join(filename)).await;
+                if latest_filename != filename_owned {
+                    let _ = tokio::fs::remove_file(mods_dir.join(&filename_owned)).await;
                 }
                 let _ = tokio::fs::remove_file(&target).await;
                 match tokio::fs::rename(&part_path, &target).await {
@@ -537,9 +539,9 @@ pub async fn update(
                         dl.speed_bps = 0;
                         let state = dl.to_state();
                         let _ = app.emit("download::finished", state);
-                        info!("обновлён: {filename} → {latest_filename}");
+                        info!("обновлён: {filename_owned} → {latest_filename}");
                         let mut entries = crate::ledger::load();
-                        entries.remove(filename);
+                        entries.remove(&filename_owned);
                         entries.insert(
                             latest_filename.clone(),
                             crate::ledger::LedgerEntry {
