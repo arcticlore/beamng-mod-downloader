@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af67726
-      - name: Install and run osv-scanner
-        run: |
-          curl -sSfL https://osv.dev/install.sh | sh -s -- -b /usr/local/bin
-          osv-scanner --config osv-scanner.toml \
-            src-tauri/Cargo.lock frontend/package-lock.json
+      - uses: google/osv-scanner-action@v2.6.0
+        with:
+          lockfile: |
+            src-tauri/Cargo.lock
+            frontend/package-lock.json
+          severity: HIGH,CRITICAL
+          config: osv-scanner.toml
