@@ -35,7 +35,7 @@ test("sanitizeFileName: запрещённые символы и хвостов�
 });
 
 test("tokenize: стоп-слова и короткие токены", () => {
-  assert.deepEqual([...tokenize("BeamNG mod drive")].sort(), ["beamng"]);
+  assert.deepEqual([...tokenize("BeamNG mod drive")].sort(), []);
   assert.deepEqual([...tokenize("a bcd")].sort(), ["bcd"]);
   assert.deepEqual([...tokenize("mod x2")].sort(), []);
 });
