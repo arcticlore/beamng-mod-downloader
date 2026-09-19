@@ -76,12 +76,10 @@ for (const w of conf.app?.windows ?? []) {
 if (conf.app?.windows?.length) ok("devtools выключены во всех окнах");
 
 const remoteIpc = conf.app?.security?.dangerousRemoteDomainIpcAccess;
-if (!Array.isArray(remoteIpc)) {
-  fail("app.security.dangerousRemoteDomainIpcAccess должен быть массивом");
-} else if (remoteIpc.length !== 0) {
-  fail(`remote-domain IPC access включён: ${JSON.stringify(remoteIpc)}`);
+if (remoteIpc !== undefined) {
+  fail("app.security.dangerousRemoteDomainIpcAccess удалён/не нужен (tauri-build 2.6+): remote IPC задаётся только через capabilities; должен отсутствовать");
 } else {
-  ok("remote-domain IPC access не разрешён (пустой массив)");
+  ok("remote-domain IPC не включён (capabilities local:true, поле исключено)");
 }
 
 // capabilities

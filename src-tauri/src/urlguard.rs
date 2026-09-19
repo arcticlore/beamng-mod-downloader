@@ -30,8 +30,8 @@ const ALLOWED_HOST_SUFFIXES: &[&str] = &[
     "github.com",
     "githubusercontent.com", // avatars, release-assets, objects
     "worldofmods.com",
-    "r2.dev",                      // Cloudflare R2 (беaмng.com редиректы)
-    "r2.cloudflarestorage.com",    // Cloudflare R2 storage endpoint
+    "r2.dev",                   // Cloudflare R2 (beamng.com редиректы)
+    "r2.cloudflarestorage.com", // Cloudflare R2 storage endpoint
 ];
 
 /// Максимальное число редирект-хопов.
@@ -39,8 +39,7 @@ pub const MAX_REDIRECTS: usize = 8;
 
 /// Возвращает ошибку, если URL нарушает транспортную политику.
 pub fn validate_url(url: &str) -> Result<(), String> {
-    let parsed =
-        Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
+    let parsed = Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
     match parsed.scheme() {
         "http" | "https" => {}
         other => return Err(format!("схема `{other}://` запрещена (только http/https)")),
