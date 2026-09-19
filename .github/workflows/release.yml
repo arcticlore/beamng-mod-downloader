@@ -8,9 +8,30 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Release gate: теги создаются только после полного зелёного build workflow
+  # на этом же commit. Ожидаем check-runs 'build' по SHA тега.
+  gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Wait for required build check-runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/wait-for-checks.sh "${GITHUB_SHA}"
+
   publish:
+    needs: gate
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -25,19 +46,20 @@ jobs:
             args: ""
             name: bundles-macos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
+        with:
+          persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.1.1
         with:
           node-version: "22"
           cache: npm
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable branch @ 2026-09-19
+        with:
+          toolchain: 1.88.0
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.7.3
         with:
           workspaces: "./src-tauri -> target"
 
@@ -47,11 +69,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
 
-      - name: Install frontend dependencies
+      - name: npm ci
         run: npm ci
 
       - name: Build and upload bundle
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,10 +91,13 @@ jobs:
 
             Пакеты дистрибутивов (Ubuntu/Debian/Fedora/openSUSE) — репозиторий
             OBS `home:arcticlore:apps`, см. packaging/README.md.
+
+            Сборка прошла release gate: все обязательные check-runs build-джобы
+            на этом commit — успешны.
           args: ${{ matrix.args }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.1
         with:
           name: ${{ matrix.name }}
           path: |

@@ -1,7 +1,8 @@
 [package]
 name = "beamng-mod-downloader"
-version = "0.1.1"
+version = "0.2.0"
 description = "Кроссплатформенный установщик модов для BeamNG.drive"
+license = "MIT"
 edition = "2021"
 rust-version = "1.88.0"
 
