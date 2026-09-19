@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { getDownloads, getModsFolder, getSettings, installMod, listInstalled } from "./api";
+import {
+  cancelDownload,
+  getDownloads,
+  getModsFolder,
+  getSettings,
+  installMod,
+  listInstalled,
+} from "./api";
 import { applyAppearance } from "./theme";
 import { DetailModal } from "./components/DetailModal";
 import { DownloadsPanel } from "./components/DownloadsPanel";
@@ -104,6 +111,10 @@ export default function App() {
     [installed],
   );
 
+  const onCancel = useCallback((key: string) => {
+    cancelDownload(key).catch((e) => showToast(String(e)));
+  }, [showToast]);
+
   const onInstall = useCallback(
     async (item: ModItem) => {
       const similar = findSimilarInstalled(item, installedList);
@@ -188,6 +199,7 @@ export default function App() {
                 return next;
               })
             }
+            onCancel={onCancel}
           />
         ) : tab === "installed" ? (
           <InstalledPanel
