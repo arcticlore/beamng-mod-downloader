@@ -151,7 +151,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.1.1
         with:
-          node-version: "22"
+          # Node 24/npm 11: npm 10 uses the retired quick-audit endpoint (HTTP 400),
+          # npm 11+ uses the bulk advisory endpoint.
+          node-version: "24"
       - name: npm ci
         run: npm ci
       - name: npm audit (severity >= high)
