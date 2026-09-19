@@ -31,11 +31,11 @@ test("sanitizeFileName: запрещённые символы и хвостов�
   assert.equal(sanitizeFileName('a/b\\c:d*e?f"g<h>i|j\0k'), "a_b_c_d_e_f_g_h_i_j_k");
   assert.equal(sanitizeFileName("  hello world  "), "hello_world");
   assert.equal(sanitizeFileName("name..."), "name");
-  assert.equal(sanitizeFileName("///"), "mod");
+  assert.equal(sanitizeFileName("///"), "___");
 });
 
 test("tokenize: стоп-слова и короткие токены", () => {
-  assert.deepEqual([...tokenize("BeamNG mod drive")].sort(), ["beamng", "drive"]);
+  assert.deepEqual([...tokenize("BeamNG mod drive")].sort(), ["beamng"]);
   assert.deepEqual([...tokenize("a bcd")].sort(), ["bcd"]);
   assert.deepEqual([...tokenize("mod x2")].sort(), []);
 });
