@@ -23,7 +23,7 @@ deadline=$(( $(date +%s) + TIMEOUT_S ))
 while :; do
   # check-runs, привязанные к commit (не только последний suite)
   runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate --jq \
-    '.check_runs[] | select(.name | startswith("build / ")) | {name: (.name|sub("^build / "; "")), status: .status, conclusion: .conclusion}' 2>/dev/null || echo "[]")
+    '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}' 2>/dev/null || echo "[]")
 
   missing=0
   failed=0

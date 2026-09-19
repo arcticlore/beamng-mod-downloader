@@ -16,6 +16,7 @@ on:
       - "README.md"
       - ".github/workflows/**"
       - "packaging/**"
+      - "scripts/**"
   pull_request:
     paths:
       - "src/**"
@@ -26,6 +27,7 @@ on:
       - "deny.toml"
       - ".github/workflows/**"
       - "packaging/**"
+      - "scripts/**"
   workflow_dispatch:
 
 permissions:
