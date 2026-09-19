@@ -15,7 +15,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -sSfL https://osv.dev/install.sh -o /tmp/install_osv.sh
-          sh /tmp/install_osv.sh -b /usr/local/bin
+          bash /tmp/install_osv.sh -b /usr/local/bin
           echo "osv-scanner version:"
           osv-scanner --version
           echo "Running scan..."
