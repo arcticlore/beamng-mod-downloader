@@ -3,24 +3,25 @@
 //! Политика:
 //! - допустимы только схемы http/https;
 //! - явно указанный порт — только 80/443;
-//! - host не может быть IP-литералом (никаких 127.0.0.1, ::1, RFC1918,
-//!   link-local, metadata-адресов) — разрешены только доменные имена;
+//! - host не может быть IP-литералом (никаких 127.0.0.1, ::1, RFC1918, link-local,
+//!   metadata-адресов) — разрешены только доменные имена;
 //! - userinfo (user:pass@) запрещён;
 //! - домен обязан входить в allowlist по registrable-domain соответствию
-//!   (запись `beamng.com` покрывает `beamng.com` и `www.beamng.com`).
+//!   (запись `beamng.com` покрывает и `beamng.com`, и `www.beamng.com`).
 //!
 //! Гейт применяется в трёх местах:
-//! - `http::fetch_bytes`/`http::fetch_string` — страницы/API источников;
+//! - `http::fetch_bytes` / `http::fetch_string` — страницы и API источников;
 //! - `sources::github::gh_get` — прямой вызов GitHub API;
 //! - `download::run_download` — непосредственное скачивание архива.
-//! Плюс custom redirect-политика в `http::build_client`: каждый редирект-хоп
-//! повторно валидируется (beamng.com/R2, github.com/githubusercontent.com
-//! отдают контент через редиректы с других доменов — поэтому РАЗРЕШЕНЫ
-//! r2.dev / r2.cloudflarestorage.com / githubusercontent.com).
 //!
-//! Ограничение: gard против DNS-ребinding — на уровне hostname мы не делаем
-//! собственный DNS-резолв (это async); literal-IP заблокированы напрямую,
-//! что покрывает классические SSRF-векторы без потери функциональности.
+//! Плюс custom redirect-политика в `http::build_client`: каждый редирект-хоп
+//! повторно валидируется (beamng.com и github.com отдают контент через
+//! редиректы с других доменов — поэтому РАЗРЕШЕНЫ r2.dev,
+//! r2.cloudflarestorage.com и githubusercontent.com).
+//!
+//! Ограничение: против DNS-ребinding на уровне hostname мы не делаем собственный
+//! DNS-резолв (это async); literal-IP заблокированы напрямую, что покрывает
+//! классические SSRF-векторы без потери функциональности.
 
 use reqwest::Url;
 
@@ -158,12 +159,12 @@ mod tests {
     }
 
     #[test]
-    fn redirect_chain_is_bounded() {
-        let policy = redirect_policy();
-        // validate_url used by the custom policy is the same gate:
+    fn redirect_policy_is_bounded() {
+        assert_eq!(MAX_REDIRECTS, 8);
+        let _ = redirect_policy();
+        // validate_url остаётся единым гейтом и для custom redirect-политики:
         assert!(validate_url("https://www.beamng.com/x").is_ok());
         assert!(validate_url("https://evil.com/").is_err());
-        assert!(MAX_REDIRECTS == 8);
     }
 
     #[test]
