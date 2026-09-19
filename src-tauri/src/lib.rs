@@ -254,18 +254,15 @@ async fn verify_installed(state: State<'_, AppState>) -> Result<Vec<IntegrityRep
         .mods_folder
         .clone()
         .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
-    let list = installer::list_installed(&PathBuf::from(&mods_folder)).map_err(|e| e.to_string())?;
+    let list =
+        installer::list_installed(&PathBuf::from(&mods_folder)).map_err(|e| e.to_string())?;
     let ledger = ledger::load();
     tokio::task::spawn_blocking(move || {
         let mut reports: Vec<IntegrityReport> = Vec::with_capacity(list.len());
         for it in list {
             let path = PathBuf::from(&it.path);
             let (zip_ok, entries, sha256) = match archive::validate_zip(&path) {
-                Ok(summary) => (
-                    true,
-                    summary.entries,
-                    archive::sha256_file(&path).ok(),
-                ),
+                Ok(summary) => (true, summary.entries, archive::sha256_file(&path).ok()),
                 Err(_) => (false, 0, None),
             };
             let tracked = ledger.get(&it.filename).and_then(|e| e.sha256.clone());

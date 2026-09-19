@@ -217,11 +217,7 @@ async fn stream_to_part(
 }
 
 /// Проверяет лимит параллельных загрузок и что файл не скачивается дважды.
-async fn ensure_capacity(
-    table: &DownloadTable,
-    key: &str,
-    filename: &str,
-) -> Result<()> {
+async fn ensure_capacity(table: &DownloadTable, key: &str, filename: &str) -> Result<()> {
     let map = table.lock().await;
     if map.len() >= MAX_CONCURRENT_DOWNLOADS {
         return Err(anyhow!(
@@ -326,6 +322,7 @@ pub async fn start(
     let app = app.clone();
     let client = client.clone();
     let table = table.clone();
+    let cancels_owned = cancels.clone();
     let part_path = mods_dir.join(format!(".{filename}.part"));
     let cancel = register_cancel(cancels, &key);
     let ledger_source = req.source.clone();
@@ -346,7 +343,7 @@ pub async fn start(
         };
         let result = run_download(&app, &client, &table, &job).await;
 
-        unregister_cancel(cancels, &task_key);
+        unregister_cancel(&cancels_owned, &task_key);
 
         let mut map = table.lock().await;
         let entry = map.remove(&task_key);
@@ -446,7 +443,9 @@ pub async fn update(
     let entry = crate::ledger::load()
         .get(filename)
         .cloned()
-        .ok_or_else(|| anyhow!("мод `{filename}` не был установлен лаунчером — обновлять нечего"))?;
+        .ok_or_else(|| {
+            anyhow!("мод `{filename}` не был установлен лаунчером — обновлять нечего")
+        })?;
 
     // Сначала узнаём актуальную версию (дату публикации) — её и запишем в ledger.
     let detail = sources::detail(client, &entry.source, filename, &entry.key)
@@ -497,12 +496,13 @@ pub async fn update(
     let app = app.clone();
     let client = client.clone();
     let table = table.clone();
-    let cancel = register_cancel(cancels, &key);
+    let cancels_owned = cancels.clone();
+    let cancel = register_cancel(&cancels_owned, &key);
     let task_cancel = cancel.clone();
     let url = url.clone();
     let source = entry.source.clone();
-    let entry = entry.clone();
     let latest_key = detail.item.key.clone();
+    let installed_published = entry.published.clone();
 
     tokio::spawn(async move {
         let task_part = part_path.clone();
@@ -518,11 +518,11 @@ pub async fn update(
         )
         .await;
 
-        unregister_cancel(cancels, &task_key);
+        unregister_cancel(&cancels_owned, &task_key);
 
         let mut map = table.lock().await;
-        let entry = map.remove(&task_key);
-        match (result, entry) {
+        let record = map.remove(&task_key);
+        match (result, record) {
             (Ok((hex, _bytes)), Some(mut dl)) => {
                 let target = mods_dir.join(&latest_filename);
                 // Заменяем старый архив (обновление может сменить имя файла).
@@ -551,7 +551,7 @@ pub async fn update(
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .map(|d| d.as_secs())
                                     .unwrap_or(0),
-                                published: latest_published.clone().or_else(|| entry.published.clone()),
+                                published: latest_published.clone().or(installed_published),
                                 sha256: Some(hex),
                             },
                         );
