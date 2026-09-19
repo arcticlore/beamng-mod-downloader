@@ -57,7 +57,36 @@ node_ok() {
 
 setup_rust() {
     if rust_ok; then log "rust: нашли $(cargo --version | awk '{print $2}')"; return; fi
-    log "rust: система старая или нет cargo, ставлю rustup (stable)"
+
+    # Вендоренный 1.88 toolchain из тарбола push.sh (офлайн, для целей
+    # со старым системным rust / без DNS в билд-VM: Leap, Ubuntu, Debian).
+    local TC="$ROOT/toolchain"
+    local TCPFX="$TC/rustc"
+    local TCXZ="$TC/rust-1.88.0-x86_64-unknown-linux-gnu.tar.xz"
+    if [ -x "$TCPFX/bin/cargo" ]; then
+        log "rust: свой toolchain $TCPFX"
+        export PATH="$TCPFX/bin:$PATH"
+        export CARGO_HOME="$HOME/.cargo"
+        log "rust: $(cargo --version)"
+        return
+    fi
+    if [ -f "$TCXZ" ]; then
+        log "rust: ставлю вендоренный 1.88.0 из тарбола (офлайн)"
+        tar -xJf "$TCXZ" -C "$TC"
+        rm -rf "$TCPFX"
+        (cd "$TC/rust-1.88.0-x86_64-unknown-linux-gnu" && \
+            ./install.sh --prefix="$TCPFX" \
+                --components=rustc,cargo,rust-std-x86_64-unknown-linux-gnu \
+                --disable-ldconfig >/dev/null)
+        rm -rf "$TC/rust-1.88.0-x86_64-unknown-linux-gnu"
+        export PATH="$TCPFX/bin:$PATH"
+        export CARGO_HOME="$HOME/.cargo"
+        log "rust: $(cargo --version)"
+        log "cargo: $(cargo --version)"
+        return
+    fi
+
+    log "rust: система старая и нет вендоренного тулчейна, ставлю rustup (stable)"
     curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
     source "$HOME/.cargo/env"
     export CARGO_HOME="$HOME/.cargo"

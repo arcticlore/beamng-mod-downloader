@@ -59,6 +59,17 @@ log "  vite (dist/)"
 log "  cargo vendor"
 (cd "$SRC" && cargo vendor --locked --manifest-path src-tauri/Cargo.toml vendor >/dev/null)
 
+# Вендоренный Rust toolchain 1.88 для целей со старым системным rust
+# (Leap, Ubuntu, Debian) — там билд-VM без DNS, rustup не работает.
+if [ -f "$HERE/toolchain/rust-1.88.0-x86_64-unknown-linux-gnu.tar.xz" ]; then
+    log "  $HERE/toolchain/rust-1.88.0-*.tar.xz -> toolchain/"
+    mkdir -p "$SRC/toolchain"
+    cp "$HERE/toolchain/rust-1.88.0-x86_64-unknown-linux-gnu.tar.xz" \
+       "$SRC/toolchain/"
+else
+    log "  toolchain-файл не найден, тарбол без вендоренного rust"
+fi
+
 mkdir -p "$SRC/.cargo"
 cat > "$SRC/.cargo/config.toml" <<'EOF'
 [source.crates-io]

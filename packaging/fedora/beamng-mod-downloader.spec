@@ -31,6 +31,7 @@ BuildRequires:  npm
 BuildRequires:  typelib-1_0-JavaScriptCore-4_1
 BuildRequires:  typelib-1_0-WebKit2-4_1
 BuildRequires:  libayatana-appindicator-devel
+BuildRequires:  pkgconfig(libsoup-3.0)
 %endif
 BuildRequires:  pkgconfig(gtk+-3.0)
 BuildRequires:  librsvg2-devel
