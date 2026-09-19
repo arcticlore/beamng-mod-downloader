@@ -1,4 +1,5 @@
-use anyhow::Result;
+use crate::urlguard;
+use anyhow::{anyhow, Result};
 use std::time::Duration;
 
 pub const DEFAULT_UA: &str = concat!(
@@ -15,6 +16,7 @@ pub fn build_client() -> Result<reqwest::Client> {
         .gzip(true)
         .brotli(true)
         .deflate(true)
+        .redirect(urlguard::redirect_policy())
         .build()?)
 }
 
@@ -23,6 +25,7 @@ pub async fn fetch_bytes(
     url: &str,
     referer: Option<&str>,
 ) -> Result<Vec<u8>> {
+    urlguard::validate_url(url).map_err(|e| anyhow!("SSRF:{e}"))?;
     let mut req = client.get(url);
     if let Some(r) = referer {
         req = req.header(reqwest::header::REFERER, r);

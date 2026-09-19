@@ -17,11 +17,12 @@
         "height": 820,
         "minWidth": 940,
         "minHeight": 620,
-        "resizable": true
+        "resizable": true,
+        "devtools": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; font-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
     }
   },
   "bundle": {

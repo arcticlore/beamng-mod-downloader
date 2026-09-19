@@ -103,6 +103,9 @@ pub async fn start(
             .map_err(|e| anyhow!("{e}"))?;
     info!("resolve: source={} url={url} → {filename}", req.source);
 
+    crate::urlguard::validate_url(&url)
+        .map_err(|e| anyhow!("SSRF-gate: загрузка запрещена: {e}"))?;
+
     // Если файл уже установлен (есть в папке модов) — не перезаписываем архив,
     // а сообщаем пользователю
     let final_path = mods_dir.join(&filename);
