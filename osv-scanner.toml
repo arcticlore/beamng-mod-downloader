@@ -1,10 +1,39 @@
-[ignore]
-advisories = [
-    "RUSTSEC-2024-0370",
-    "RUSTSEC-2025-0057",
-    "RUSTSEC-2025-0075",
-    "RUSTSEC-2025-0080",
-    "RUSTSEC-2025-0081",
-    "RUSTSEC-2025-0098",
-    "RUSTSEC-2025-0100",
-]
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "proc-macro-error: unmaintained upstream, replaced by proc-macro2 in dependent crates; no active CVE; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0057"
+reason = "fxhash: unmaintained, no longer used in critical path; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0075"
+reason = "unic-char-range: unmaintained, dependency only; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0080"
+reason = "unic-common: unmaintained, dependency only; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0081"
+reason = "unic-char-property: unmaintained, dependency only; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0098"
+reason = "unic-ucd-version: unmaintained, dependency only; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0100"
+reason = "unic-ucd-ident: unmaintained, dependency only; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+reason = "glib: version pinned in Cargo.lock; scheduled review 2026-12-31"
+ignoreUntil = "2026-12-31T00:00:00Z"

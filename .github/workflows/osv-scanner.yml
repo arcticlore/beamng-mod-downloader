@@ -7,12 +7,18 @@ on:
 jobs:
   osv-scanner:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Run osv-scanner
+      - name: Install and run osv-scanner
         run: |
-          pip install --quiet osv-scanner 2>/dev/null || true
-          if command -v osv-scanner >/dev/null 2>&1; then
-            osv-scanner --config osv-scanner.toml src-tauri/Cargo.lock frontend/package-lock.json
-          fi
-          echo "osv-scanner check passed"
+          set -euo pipefail
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+          echo "osv-scanner version:"
+          osv-scanner --version
+          echo "Running scan..."
+          osv-scanner --config ./osv-scanner.toml -r ./
+          echo "Scan completed successfully"
