@@ -230,7 +230,7 @@ mod tests {
         out.extend_from_slice(&0_u16.to_le_bytes());
         out.extend_from_slice(name.as_bytes());
         out.extend_from_slice(data);
-        let local_off = 0_u32; // единственный локальный заголовок — в начале
+        let local_off = 0_u32;
         // Central directory
         let cd_start = out.len() as u32;
         out.extend_from_slice(&CD_SIG);
