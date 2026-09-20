@@ -1,22 +1,36 @@
 name: OSV Scanner
+
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
 jobs:
   osv-scanner:
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Install and run osv-scanner
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
+        with:
+          persist-credentials: false
+
+      - name: Install osv-scanner (checksum-verified)
+        env:
+          OSV_VERSION: v2.6.0
         run: |
           set -euo pipefail
-          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner
-          chmod +x /usr/local/bin/osv-scanner
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64" -o /tmp/osv-scanner
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_SHA256SUMS" -o /tmp/osv-scanner_SHA256SUMS
+          grep "  osv-scanner_linux_amd64$" /tmp/osv-scanner_SHA256SUMS | sed 's#  osv-scanner_linux_amd64$#  /tmp/osv-scanner#' > /tmp/osv-scanner.sha256
+          sha256sum -c /tmp/osv-scanner.sha256
+          install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
+
+      - name: Run osv-scanner
+        run: |
+          set -euo pipefail
           echo "osv-scanner version:"
           osv-scanner --version
           echo "Running scan..."
