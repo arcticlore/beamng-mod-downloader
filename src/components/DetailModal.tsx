@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { getModDetail } from "../api";
+import { useSources } from "../SourcesContext";
+import { installModeLabel, trustLabel, urlHost } from "../sources";
 import type { DownloadState, ModDetail, ModItem } from "../types";
-import { formatBytes, installedFileName, SOURCES } from "../types";
+import { formatBytes } from "../types";
 
 interface Props {
   item: ModItem;
@@ -13,9 +15,15 @@ interface Props {
 }
 
 export function DetailModal({ item, dl, installed, similar, onInstall, onClose }: Props) {
+  const { labelOf, descriptorOf, filenameFor } = useSources();
   const [detail, setDetail] = useState<ModDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
+
+  const descriptor = descriptorOf(item.source);
+  const autoInstall = descriptor?.installMode === "mods_zip";
+  const modeLabel = descriptor ? installModeLabel(descriptor.installMode) : null;
+  const host = urlHost(item.key);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +72,22 @@ export function DetailModal({ item, dl, installed, similar, onInstall, onClose }
             )}
           </div>
 <div className="modal-info">
-              <div className="mod-source">{SOURCES[item.source]?.label ?? item.source}</div>
+              <div className="mod-source">
+                {labelOf(item.source)}
+                {descriptor && (
+                  <span
+                    className={`trust-badge trust-${descriptor.trustLevel}`}
+                    title={`Доверие: ${trustLabel(descriptor.trustLevel)}`}
+                  >
+                    {trustLabel(descriptor.trustLevel)}
+                  </span>
+                )}
+                {descriptor && descriptor.installMode !== "mods_zip" && (
+                  <span className="install-mode-badge" title={modeLabel ?? undefined}>
+                    {modeLabel}
+                  </span>
+                )}
+              </div>
               <h2>{item.name}</h2>
               {!installed && similar && (
                 <div className="mod-warning">
@@ -76,6 +99,7 @@ export function DetailModal({ item, dl, installed, similar, onInstall, onClose }
             {item.downloads && <div className="mod-meta">скачиваний: {item.downloads}</div>}
             {item.sizeBytes ? <div className="mod-meta">размер: {formatBytes(item.sizeBytes)}</div> : null}
             {item.published && <div className="mod-meta">дата: {item.published}</div>}
+            {host && <div className="mod-meta">домен: {host}</div>}
             <div className="mod-full-desc">
               {detail ? (
                 detail.fullDescription || detail.item.description || "Описание отсутствует."
@@ -89,12 +113,19 @@ export function DetailModal({ item, dl, installed, similar, onInstall, onClose }
             <div className="modal-actions">
               <button
                 className="btn btn-primary btn-lg"
-                disabled={installed || downloading}
+                disabled={installed || downloading || !autoInstall}
                 onClick={() => onInstall(item)}
+                title={modeLabel ?? undefined}
               >
-                {installed ? "✓ Установлено" : downloading ? "Загрузка…" : "Скачать и установить"}
+                {!autoInstall
+                  ? "Установка вручную"
+                  : installed
+                    ? "✓ Установлено"
+                    : downloading
+                      ? "Загрузка…"
+                      : "Скачать и установить"}
               </button>
-              <span className="hint-file">{installedFileName(item)}</span>
+              <span className="hint-file">{filenameFor(item)}</span>
             </div>
           </div>
         </div>

@@ -1,6 +1,8 @@
 import { useMemo } from "react";
+import { useSources } from "../SourcesContext";
+import { installModeLabel, trustLabel } from "../sources";
 import type { DownloadState, ModItem } from "../types";
-import { formatBytes, formatSpeed, SOURCES } from "../types";
+import { formatBytes, formatSpeed } from "../types";
 import { ProgressBar } from "./ProgressBar";
 
 interface Props {
@@ -19,8 +21,12 @@ function installedTail(dl: DownloadState | undefined) {
 }
 
 export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Props) {
+  const { labelOf, descriptorOf } = useSources();
   const active = installedTail(dl);
-  const disabled = !!active || installed;
+  const descriptor = descriptorOf(item.source);
+  const installMode = descriptor?.installMode ?? "mods_zip";
+  const autoInstall = installMode === "mods_zip";
+  const disabled = !!active || installed || !autoInstall;
 
   const meta = useMemo(() => {
     const parts: string[] = [];
@@ -46,13 +52,23 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
           <div className="mod-thumb-placeholder">?</div>
         )}
         <span className="mod-source">
-          {SOURCES[item.source]?.label ?? item.source}
+          {labelOf(item.source)}
         </span>
       </div>
       <div className="mod-body">
-        <h3 className="mod-name" title={item.name}>
-          {item.name}
-        </h3>
+        <div className="mod-name-row">
+          <h3 className="mod-name" title={item.name}>
+            {item.name}
+          </h3>
+          {descriptor && (
+            <span
+              className={`trust-badge trust-${descriptor.trustLevel}`}
+              title={`Доверие: ${trustLabel(descriptor.trustLevel)}`}
+            >
+              {trustLabel(descriptor.trustLevel)}
+            </span>
+          )}
+        </div>
         {warning && <div className="mod-warning">{warning}</div>}
         {meta && <div className="mod-meta">{meta}</div>}
         {item.description && (
@@ -87,16 +103,26 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
               disabled={disabled}
               onClick={() => onInstall(item)}
               title={
-                installed
-                  ? "Уже в папке модов"
-                  : active?.state === "error"
-                    ? active.error ?? "Ошибка загрузки"
-                    : similar
-                      ? "Похожий мод уже установлен — установка запросит подтверждение"
-                      : "Скачать и установить"
+                !autoInstall
+                  ? installModeLabel(installMode)
+                  : installed
+                    ? "Уже в папке модов"
+                    : active?.state === "error"
+                      ? active.error ?? "Ошибка загрузки"
+                      : similar
+                        ? "Похожий мод уже установлен — установка запросит подтверждение"
+                        : "Скачать и установить"
               }
             >
-              {installed ? "✓ Установлено" : active ? "Ошибка" : similar ? "Есть похожий" : "Установить"}
+              {!autoInstall
+                ? "Установка вручную"
+                : installed
+                  ? "✓ Установлено"
+                  : active
+                    ? "Ошибка"
+                    : similar
+                      ? "Есть похожий"
+                      : "Установить"}
             </button>
           </div>
         )}

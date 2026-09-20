@@ -7,8 +7,8 @@ import {
   tokenize,
   similar,
   findSimilarInstalled,
-  installedFileName,
 } from "../../src/types.ts";
+import { filenameFor } from "../../src/sources.ts";
 
 test("formatBytes: размеры", () => {
   assert.equal(formatBytes(null), "");
@@ -46,14 +46,25 @@ test("similar: Jaccard-метрика", () => {
   assert.equal(similar(new Set(["a", "b"]), new Set(["b", "c"])), 1 / 3);
 });
 
-test("installedFileName: имена по источникам", () => {
+test("filenameFor: имена по правилам источников", () => {
   assert.equal(
-    installedFileName({ source: "worldofmods", key: "https://www.worldofmods.com/beamng/mods/14735-hirochi.html" }),
+    filenameFor({ source: "worldofmods", key: "https://www.worldofmods.com/beamng/mods/14735-hirochi.html" }, "html_slug"),
     "14735-hirochi.zip",
   );
   assert.equal(
-    installedFileName({ source: "github", key: "https://github.com/A/B" }),
+    filenameFor({ source: "github", key: "https://github.com/A/B" }, "owner_repo"),
     "A-B.zip",
+  );
+  assert.equal(
+    filenameFor(
+      { source: "beamngweb", key: "https://repo.beamng.com/vehicles/evtol/evtol_grp_edition/1" },
+      "basename",
+    ),
+    "1.zip",
+  );
+  assert.equal(
+    filenameFor({ source: "custom", key: "https://host.tld/path/mod-name" }, "key_stem"),
+    "mod-name.zip",
   );
 });
 

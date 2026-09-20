@@ -9,6 +9,7 @@ import {
   listInstalled,
 } from "./api";
 import { applyAppearance } from "./theme";
+import { SourcesProvider, useSources } from "./SourcesContext";
 import { DetailModal } from "./components/DetailModal";
 import { DownloadsPanel } from "./components/DownloadsPanel";
 import { InstalledPanel } from "./components/InstalledPanel";
@@ -16,28 +17,25 @@ import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
 import {
   findSimilarInstalled,
-  installedFileName,
   type AppSettings,
   type DownloadState,
   type InstalledMod,
   type ModItem,
 } from "./types";
 
-type Tab = "all" | "worldofmods" | "beamngweb" | "github" | "downloads" | "installed";
+type View = "browse" | "downloads" | "installed";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "all", label: "Все" },
-  { id: "worldofmods", label: "WorldOfMods" },
-  { id: "beamngweb", label: "Официальный сайт" },
-  { id: "github", label: "GitHub-релизы" },
+const NAV: { id: View; label: string }[] = [
+  { id: "browse", label: "Поиск модов" },
   { id: "downloads", label: "Загрузки" },
   { id: "installed", label: "Установленные" },
 ];
 
-export default function App() {
+function AppInner() {
+  const { filenameFor } = useSources();
   const [modsFolder, setModsFolder] = useState<string | null>(null);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
-  const [tab, setTab] = useState<Tab>("worldofmods");
+  const [view, setView] = useState<View>("browse");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ModItem | null>(null);
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
@@ -67,7 +65,7 @@ export default function App() {
     getModsFolder().then(setModsFolder).catch(() => {});
     getSettings().then(setSettingsState).catch(() => {});
     refreshInstalled();
-    setDownloadsBySnapshot();
+    void setDownloadsBySnapshot();
     const un1 = listen<DownloadState>("download::progress", (e) => {
       setDownloads((prev) => ({ ...prev, [e.payload.key]: e.payload }));
     });
@@ -111,14 +109,18 @@ export default function App() {
     [installed],
   );
 
-  const onCancel = useCallback((key: string) => {
-    cancelDownload(key).catch((e) => showToast(String(e)));
-  }, [showToast]);
+  const onCancel = useCallback(
+    (key: string) => {
+      cancelDownload(key).catch((e) => showToast(String(e)));
+    },
+    [showToast],
+  );
 
   const onInstall = useCallback(
     async (item: ModItem) => {
+      const name = filenameFor(item);
       const similar = findSimilarInstalled(item, installedList);
-      if (similar && !installedNames.has(installedFileName(item))) {
+      if (similar && !installedNames.has(name)) {
         const ok = window.confirm(
           `Похоже, мод «${item.name}» уже установлен как файл «${similar.filename}». Скачать его ещё раз (возможно, это обновление или одноимённый мод)?`,
         );
@@ -137,7 +139,7 @@ export default function App() {
           [key]: {
             key,
             name: item.name,
-            filename: installedFileName(item),
+            filename: name,
             received: 0,
             total: null,
             speedBps: 0,
@@ -150,7 +152,7 @@ export default function App() {
         showToast(String(e));
       }
     },
-    [showToast, installedList, installedNames],
+    [showToast, installedList, installedNames, filenameFor],
   );
 
   return (
@@ -175,11 +177,11 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        {TABS.map((t) => (
+        {NAV.map((t) => (
           <button
             key={t.id}
-            className={`tab ${tab === t.id ? "tab-active" : ""}`}
-            onClick={() => setTab(t.id)}
+            className={`tab ${view === t.id ? "tab-active" : ""}`}
+            onClick={() => setView(t.id)}
           >
             {t.label}
           </button>
@@ -187,7 +189,7 @@ export default function App() {
       </nav>
 
       <main className="app-main">
-        {tab === "downloads" ? (
+        {view === "downloads" ? (
           <DownloadsPanel
             downloads={downloads}
             onClearFinished={() =>
@@ -201,14 +203,13 @@ export default function App() {
             }
             onCancel={onCancel}
           />
-        ) : tab === "installed" ? (
+        ) : view === "installed" ? (
           <InstalledPanel
             settings={settings}
             onOpenSettings={() => setSettingsOpen(true)}
           />
         ) : (
           <ModsBrowser
-            source={tab}
             downloads={downloads}
             installedNames={installedNames}
             installedList={installedList}
@@ -234,9 +235,9 @@ export default function App() {
         <DetailModal
           item={detailItem}
           dl={downloads[detailItem.id]}
-          installed={installedNames.has(installedFileName(detailItem))}
+          installed={installedNames.has(filenameFor(detailItem))}
           similar={
-            installedNames.has(installedFileName(detailItem))
+            installedNames.has(filenameFor(detailItem))
               ? null
               : findSimilarInstalled(detailItem, installedList)
           }
@@ -247,5 +248,13 @@ export default function App() {
 
       {toast && <div className="toast">{toast}</div>}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <SourcesProvider>
+      <AppInner />
+    </SourcesProvider>
   );
 }

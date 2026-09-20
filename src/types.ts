@@ -118,11 +118,58 @@ export const BROWSER_SORTS = [
   { id: "size", label: "По размеру" },
 ];
 
-export const SOURCES: Record<string, { id: string; label: string }> = {
-  worldofmods: { id: "worldofmods", label: "WorldOfMods" },
-  beamngweb: { id: "beamngweb", label: "Официальный сайт BeamNG" },
-  github: { id: "github", label: "GitHub-релизы" },
-};
+export type SourceGroup = "official" | "forges" | "community" | "custom";
+export type TrustLevel =
+  | "official"
+  | "verified_forge"
+  | "community"
+  | "third_party"
+  | "custom";
+export type InstallMode = "mods_zip" | "manual_external" | "unsupported";
+export type SourceAuth = "none" | "api_key" | "custom";
+export type SourceStatus =
+  | "ready"
+  | "needs_api_key"
+  | "not_configured"
+  | "unavailable"
+  | "rate_limited";
+export type FilenameRule = "basename" | "html_slug" | "owner_repo" | "key_stem";
+
+export interface SourceCapabilities {
+  search: boolean;
+  categories: boolean;
+  pagination: boolean;
+  detail: boolean;
+  directZipDownload: boolean;
+  manualDownload: boolean;
+  checksums: boolean;
+  updateDetection: boolean;
+}
+
+/** Описание источника из backend registry — единый source of truth. */
+export interface SourceDescriptor {
+  id: string;
+  label: string;
+  group: SourceGroup;
+  trustLevel: TrustLevel;
+  enabledByDefault: boolean;
+  legacyDefault: boolean;
+  homepage: string;
+  termsOrPolicyUrl: string | null;
+  warning: string | null;
+  installMode: InstallMode;
+  auth: SourceAuth;
+  status: SourceStatus;
+  filenameRule: FilenameRule;
+  capabilities: SourceCapabilities;
+  categories: SourceCategory[];
+}
+
+/** enabled — разрешены сетевые запросы; selected — активны в поиске (null = все enabled). */
+export interface SourceSelection {
+  enabled: string[];
+  selected: string[] | null;
+}
 
 /** Санитизация имени файла — зеркалит `sanitize_filename` в src-tauri/src/http.rs. */
 export function sanitizeFileName(raw: string): string {
@@ -135,20 +182,7 @@ export function sanitizeFileName(raw: string): string {
   return cleaned;
 }
 
-/** Имя zip-файла, который будет создан при установке этого мода, по его ключу. */
-export function installedFileName(item: ModItem): string {
-  const parts = item.key.split("/").filter(Boolean);
-  const last = parts.pop() ?? "";
-  if (item.source === "worldofmods") return sanitizeFileName(last.replace(/\.html$/, "")) + ".zip";
-  if (item.source === "beamngweb") return sanitizeFileName(last) + ".zip";
-  if (item.source === "github") {
-    const owner = parts.pop() ?? "";
-    return `${owner}-${last}.zip`;
-  }
-  return last;
-}
-
-export function formatBytes(n: number | null | undefined): string {
+export const THEMES = [
   if (n == null) return "";
   if (n < 1024) return `${n} Б`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`;

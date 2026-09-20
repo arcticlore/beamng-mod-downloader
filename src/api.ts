@@ -11,6 +11,8 @@ import type {
   ModsFolderCandidate,
   ModUpdate,
   SourceCategory,
+  SourceDescriptor,
+  SourceSelection,
 } from "./types";
 
 /** invoke с логированием команды и ошибок в файл лога приложения. */
@@ -75,5 +77,17 @@ export const getSettings = () => call<AppSettings>("get_app_settings");
 
 export const setSettings = (settings: AppSettings) =>
   call<void>("set_app_settings", { settings });
+
+export const getSourceRegistry = () => call<SourceDescriptor[]>("get_source_registry");
+
+export const getSourceSelection = () => call<SourceSelection>("get_source_selection");
+
+export const setSourceEnabled = (sourceId: string, enabled: boolean) =>
+  call<void>("set_source_enabled", { sourceId, enabled });
+
+export const setSourceSelected = (sourceIds: string[] | null) =>
+  call<void>("set_source_selected", { sourceIds });
+
+export const resetSourcesToDefaults = () => call<void>("reset_sources_to_defaults");
 
 export const openLogDir = () => call<void>("open_log_dir");

@@ -132,3 +132,125 @@ pub struct AppSettings {
     /// Размер карточек в браузере: "compact" | "normal" | "large".
     pub card_size: Option<String>,
 }
+
+// --- Единый registry источников (single source of truth для UI) ---
+
+/// Группа источника для группировки в Source Picker.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceGroup {
+    Official,
+    Forges,
+    Community,
+    Custom,
+}
+
+/// Уровень доверия к источнику. Показывается в карточках и в Settings.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustLevel {
+    Official,
+    VerifiedForge,
+    Community,
+    ThirdParty,
+    Custom,
+}
+
+/// Режим установки, который источник реально поддерживает.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallMode {
+    /// Безопасный кандидат для копирования в папку модов.
+    ModsZip,
+    /// Открыть страницу/инструкцию, не устанавливать автоматически.
+    ManualExternal,
+    /// Показать причину.
+    Unsupported,
+}
+
+/// Требования к аутентификации источника.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceAuth {
+    None,
+    /// Требуется API key (хранится в защищённом хранилище, не в config.json).
+    ApiKey,
+    /// Другая пользовательская настройка (например учётная запись).
+    Custom,
+}
+
+/// Статус конфигурации источника на текущей машине.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceStatus {
+    Ready,
+    NeedsApiKey,
+    NotConfigured,
+    Unavailable,
+    RateLimited,
+}
+
+/// Правило, по которому frontend предсказывает имя локального zip-файла
+/// до фактического resolve на backend'е (используется для сравнения с уже
+/// установленными модами). Эталонный ответ всегда даёт backend.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FilenameRule {
+    /// Последний сегмент key, очищенный от спецсимволов.
+    Basename,
+    /// Последний сегмент key без расширения `.html`.
+    HtmlSlug,
+    /// `owner-repo.zip` из `https://…/owner/repo`.
+    OwnerRepo,
+    /// Ключ как есть (после санитизации backend'а).
+    KeyStem,
+}
+
+/// Честно описывает, что источник умеет (не изображаем недоступное доступным).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceCapabilities {
+    pub search: bool,
+    pub categories: bool,
+    pub pagination: bool,
+    pub detail: bool,
+    pub direct_zip_download: bool,
+    pub manual_download: bool,
+    pub checksums: bool,
+    pub update_detection: bool,
+}
+
+/// Декларативное описание источника для UI. Единственный source of truth —
+/// backend registry (`sources::registry::registry()`).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceDescriptor {
+    pub id: String,
+    pub label: String,
+    pub group: SourceGroup,
+    pub trust_level: TrustLevel,
+    /// Входит ли источник в рекомендуемый набор по умолчанию (для новых конфигов).
+    pub enabled_by_default: bool,
+    /// Был ли источник включён в legacy-версии (0.2.x) — для миграции старых конфигов.
+    pub legacy_default: bool,
+    pub homepage: String,
+    pub terms_or_policy_url: Option<String>,
+    /// Предупреждение при включении (например «сторонний источник»).
+    pub warning: Option<String>,
+    pub install_mode: InstallMode,
+    pub auth: SourceAuth,
+    pub status: SourceStatus,
+    pub filename_rule: FilenameRule,
+    pub capabilities: SourceCapabilities,
+    pub categories: Vec<SourceCategory>,
+}
+
+/// Состояние выбора источников пользователем (persisted в config).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceSelection {
+    /// Источники, которым пользователь разрешил сетевые запросы.
+    pub enabled: Vec<String>,
+    /// Активные для поиска/агрегации. `None` = «все enabled».
+    pub selected: Option<Vec<String>>,
+}

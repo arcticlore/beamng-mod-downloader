@@ -14,7 +14,8 @@ use http::build_client;
 use log::{debug, error, info, warn};
 use models::{
     AppSettings, DownloadState, InstallRequest, InstalledMod, IntegrityReport, ModDetail,
-    ModSearchResult, ModUpdate, ModsFolderCandidate, SourceCategory,
+    ModSearchResult, ModUpdate, ModsFolderCandidate, SourceCategory, SourceDescriptor,
+    SourceSelection,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -125,6 +126,11 @@ async fn search_mods(
         order.as_deref().unwrap_or("")
     );
 
+    {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        require_source_enabled(&cfg, &source)?;
+    }
+
     if let Ok(cache) = state.listing_cache.lock() {
         if let Some((at, res)) = cache.get(&key) {
             if at.elapsed() < SEARCH_CACHE_TTL {
@@ -168,6 +174,10 @@ async fn get_mod_detail(
     key: String,
 ) -> Result<ModDetail, String> {
     debug!("detail: source={source}, id={mod_id}");
+    {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        require_source_enabled(&cfg, &source)?;
+    }
     let result = sources::detail(&state.client, &source, &mod_id, &key)
         .await
         .map_err(|e| {
@@ -182,6 +192,116 @@ fn get_categories(source: String) -> Vec<SourceCategory> {
     sources::categories(&source)
 }
 
+// --- Единый registry источников + выбор источника (enabled/selected) ---
+
+#[tauri::command]
+fn get_source_registry() -> Vec<SourceDescriptor> {
+    sources::registry::registry()
+}
+
+#[tauri::command]
+fn get_source_selection(state: State<'_, AppState>) -> SourceSelection {
+    let cfg = state.config.lock().ok();
+    let c = cfg.as_ref();
+    SourceSelection {
+        enabled: c.map(Config::enabled_sources).unwrap_or_default(),
+        selected: c.and_then(|v| v.selected_sources.clone()),
+    }
+}
+
+#[tauri::command]
+fn set_source_enabled(
+    state: State<'_, AppState>,
+    source_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    if !sources::registry::is_known(&source_id) {
+        return Err(format!("неизвестный источник `{source_id}`"));
+    }
+    let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+    let mut list = cfg.enabled_sources();
+    let present = list.iter().any(|id| id == &source_id);
+    if enabled && !present {
+        list.push(source_id.clone());
+        list.sort();
+        list.dedup();
+    } else if !enabled {
+        list.retain(|id| id != &source_id);
+    }
+    cfg.enabled_sources = Some(list);
+    // Отключаемый источник выкидываем и из активных — disabled не запрашивается.
+    if let Some(sel) = cfg.selected_sources.as_mut() {
+        sel.retain(|id| id != &source_id);
+        sel.sort();
+        sel.dedup();
+    }
+    info!("источник {}: enabled={}", source_id, enabled);
+    cfg.save().map_err(|e| {
+        error!("не сохранить config: {e}");
+        e.to_string()
+    })
+}
+
+/// `None` = «все enabled» (автоматически), `Some(list)` — явный выбор.
+#[tauri::command]
+fn set_source_selected(
+    state: State<'_, AppState>,
+    source_ids: Option<Vec<String>>,
+) -> Result<(), String> {
+    let mut ids = match source_ids {
+        None => {
+            let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+            cfg.selected_sources = None;
+            return cfg.save().map_err(|e| {
+                error!("не сохранить config: {e}");
+                e.to_string()
+            });
+        }
+        Some(v) => v,
+    };
+    ids.sort();
+    ids.dedup();
+    for id in &ids {
+        if !sources::registry::is_known(id) {
+            return Err(format!("неизвестный источник `{id}`"));
+        }
+    }
+    let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+    cfg.selected_sources = Some(ids);
+    cfg.save().map_err(|e| {
+        error!("не сохранить config: {e}");
+        e.to_string()
+    })
+}
+
+/// Сброс выбора источников к безопасным defaults (новый конфиг): включаем
+/// только рекомендуемые, активные — «все enabled».
+#[tauri::command]
+fn reset_sources_to_defaults(state: State<'_, AppState>) -> Result<(), String> {
+    let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+    cfg.enabled_sources = Some(sources::registry::default_enabled_ids(true));
+    cfg.selected_sources = None;
+    info!("выбор источников сброшен к рекомендуемым defaults");
+    cfg.save().map_err(|e| {
+        error!("не сохранить config: {e}");
+        e.to_string()
+    })
+}
+
+/// Гейт: источник должен быть enabled, иначе ни одного сетевого запроса.
+fn require_source_enabled(config: &Config, source: &str) -> Result<(), String> {
+    let enabled = config.enabled_sources();
+    if sources::can_query(&enabled, source) {
+        Ok(())
+    } else if sources::registry::is_known(source) {
+        Err(format!(
+            "источник «{source}» отключён в настройках — включите его, чтобы искать и устанавливать"
+        ))
+    } else {
+        Err(format!("неизвестный источник «{source}»"))
+    }
+}
+
 #[tauri::command]
 async fn install_mod(
     app: tauri::AppHandle,
@@ -192,13 +312,13 @@ async fn install_mod(
         "установка: source={}, id={}, name={}",
         req.source, req.mod_id, req.name
     );
-    let mods_folder = state
-        .config
-        .lock()
-        .map_err(|e| e.to_string())?
-        .mods_folder
-        .clone()
-        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+    let mods_folder = {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        require_source_enabled(&cfg, &req.source)?;
+        cfg.mods_folder
+            .clone()
+            .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?
+    };
     download::start(
         &app,
         &state.client,
@@ -224,13 +344,17 @@ async fn update_mod(
     filename: String,
 ) -> Result<String, String> {
     info!("обновление мода: {filename}");
-    let mods_folder = state
-        .config
-        .lock()
-        .map_err(|e| e.to_string())?
-        .mods_folder
-        .clone()
-        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+    let mods_folder = {
+        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        let entry = ledger::load()
+            .get(&filename)
+            .cloned()
+            .ok_or_else(|| format!("мод `{filename}` не был установлен лаунчером"))?;
+        require_source_enabled(&cfg, &entry.source)?;
+        cfg.mods_folder
+            .clone()
+            .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?
+    };
     download::update(
         &app,
         &state.client,
@@ -364,6 +488,10 @@ async fn check_updates(
     items: Vec<InstalledMod>,
 ) -> Result<Vec<ModUpdate>, String> {
     let ledger = ledger::load();
+    let enabled = {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        cfg.enabled_sources()
+    };
     let mut out = Vec::new();
     for it in items {
         let Some(entry) = ledger.get(&it.filename) else {
@@ -374,6 +502,10 @@ async fn check_updates(
         let source = entry.source.clone();
         let key = entry.key.clone();
         let installed = entry.published.clone();
+        if !sources::can_query(&enabled, &source) {
+            // disabled источник не опрашивается — источником истины остаётся ledger.
+            continue;
+        }
         // mod_id ни для чего важного не используется: detail ходит по key.
         let result = sources::detail(&state.client, &source, &filename, &key).await;
         let (latest, error) = match result {
@@ -516,6 +648,11 @@ pub fn run() {
             search_mods,
             get_mod_detail,
             get_categories,
+            get_source_registry,
+            get_source_selection,
+            set_source_enabled,
+            set_source_selected,
+            reset_sources_to_defaults,
             install_mod,
             get_downloads,
             cancel_download,
