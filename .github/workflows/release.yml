@@ -250,19 +250,33 @@ jobs:
             echo "::error::нет asset'ов для загрузки"
             exit 1
           fi
-          # Basenames уникальны между bundle-типами; на GitHub assets плоские.
+          # GitHub sanitizes имена assets при загрузке (пробел -> точка):
+          # переименовываем локально заранее, чтобы имена файлов совпадали
+          # с финальными именами на GitHub и с записями в SHA256SUMS.
+          final_assets=()
           for a in "${assets[@]}"; do
+            d="$(dirname "$a")"
+            b="$(basename "$a")"
+            s="${b// /.}"
+            s="${s//\\\\/.}"
+            if [ "$s" != "$b" ]; then
+              mv -f "$a" "$d/$s"
+            fi
+            final_assets+=("$d/$s")
+          done
+          # Basenames уникальны между bundle-типами; на GitHub assets плоские.
+          for a in "${final_assets[@]}"; do
             sha256sum "$a" | sed -E 's#  .*/#  #'
           done > "${VERSION}_SHA256SUMS.txt"
           echo "--- ${VERSION}_SHA256SUMS.txt ---"
           cat "${VERSION}_SHA256SUMS.txt"
           # self-проверка на плоском каталоге копий
           mkdir -p verify
-          for a in "${assets[@]}"; do cp "$a" verify/; done
+          for a in "${final_assets[@]}"; do cp "$a" verify/; done
           (cd verify && sha256sum -c "../${VERSION}_SHA256SUMS.txt")
           echo "SHA256SUMS: проверено OK"
-          gh release upload "$TAG" "${assets[@]}" "${VERSION}_SHA256SUMS.txt" --clobber
-          echo "загружено asset'ов: ${#assets[@]} + SHA256SUMS"
+          gh release upload "$TAG" "${final_assets[@]}" "${VERSION}_SHA256SUMS.txt" --clobber
+          echo "загружено asset'ов: ${#final_assets[@]} + SHA256SUMS"
 
       - name: Publish release
         if: ${{ !inputs.prerelease }}
