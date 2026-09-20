@@ -1,35 +1,114 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия релиза в формате semver (без префикса v), напр. 0.2.1"
+        required: true
+        type: string
+      target_sha:
+        description: "Полный commit SHA (40 hex), который прошёл все проверки и станет тегом релиза"
+        required: true
+        type: string
+      prerelease:
+        description: "Отметить релиз как prerelease"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
-  # Release gate: теги создаются только после полного зелёного build workflow
-  # на этом же commit. Ожидаем check-runs 'build' по SHA тега.
-  gate:
+  # Проверка входных данных: формат версии, full SHA, соответствие версии в repo,
+  # отсутствие конфликтующих тега/релиза.
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Validate inputs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version должен быть semver (напр. 0.2.1), получено: $VERSION"
+            exit 1
+          fi
+          if ! [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::target_sha должен быть полным 40-символьным SHA"
+            exit 1
+          fi
+
+          # пакет должен нести запрошенную версию (version-consistency локально)
+          node scripts/check-version.mjs
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "::error::версия в репозитории ($PKG_VERSION) не совпадает с inputs.version ($VERSION)"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TARGET_SHA=$TARGET_SHA" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+
+      - name: Check tag / release state (idempotent resume)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ inputs.version }}"
+
+          TAG_COMMIT="$(git ls-remote origin "refs/tags/$TAG^{}" 2>/dev/null | head -1 | cut -f1)"
+          [ -z "$TAG_COMMIT" ] && TAG_COMMIT="$(git ls-remote origin "refs/tags/$TAG" 2>/dev/null | head -1 | cut -f1)"
+          if [ -n "$TAG_COMMIT" ]; then
+            if [ "$TAG_COMMIT" != "${{ inputs.target_sha }}" ]; then
+              echo "::error::тег $TAG уже существует и указывает на $TAG_COMMIT (нужно: ${{ inputs.target_sha }})"
+              exit 1
+            fi
+            echo "info: тег $TAG уже указывает на target_sha — возобновляем"
+          else
+            echo "info: тег $TAG ещё не создан — будет создан на этапе publish"
+          fi
+
+          REL_STATE="$(gh release view "$TAG" --json state,isDraft --jq '.state + "/" + (.isDraft|tostring)' 2>/dev/null || true)"
+          echo "info: существующее состояние релиза $TAG: ${REL_STATE:-<нет>}"
+
+  # Release gate: ждём, пока build + CodeQL + реальный OSV scan прошли success
+  # ровно на target_sha (по workflow runs, exact head_sha).
+  build-and-gate:
+    needs: validate
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.target_sha }}
           fetch-depth: 1
-      - name: Wait for required build check-runs
+
+      - name: Release gate (wait-for-checks)
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/wait-for-checks.sh "${GITHUB_SHA}"
+        run: bash scripts/wait-for-checks.sh "${{ inputs.target_sha }}"
 
-  publish:
-    needs: gate
+  # Сборка bundles на трёх платформах. НИЧЕГО не публикует — только артефакты.
+  build:
+    needs: [validate, build-and-gate]
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
     strategy:
@@ -49,6 +128,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.target_sha }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.1.1
         with:
@@ -72,28 +152,10 @@ jobs:
       - name: npm ci
         run: npm ci
 
-      - name: Build and upload bundle
+      - name: Build bundle
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         id: tauri
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NO_STRIP: "1"
         with:
-          tagName: v__VERSION__
-          releaseName: BeamNG Mod Downloader v__VERSION__
-          releaseDraft: true
-          releaseBody: |
-            Автоматическая сборка из тега v__VERSION__.
-
-            - Linux: AppImage, deb, rpm
-            - Windows: NSIS (.exe), MSI
-            - macOS: DMG
-
-            Пакеты дистрибутивов (Ubuntu/Debian/Fedora/openSUSE) — репозиторий
-            OBS `home:arcticlore:apps`, см. packaging/README.md.
-
-            Сборка прошла release gate: все обязательные check-runs build-джобы
-            на этом commit — успешны.
           args: ${{ matrix.args }}
 
       - name: Upload build artifacts
@@ -104,3 +166,123 @@ jobs:
             src-tauri/target/release/bundle/**
           if-no-files-found: error
           retention-days: 14
+
+  # Публикация: только после трёх зелёных сборок. Создаёт annotated tag на
+  # target_sha, затем draft release с авто-notes, загружает все assets +
+  # SHA256SUMS, публикует. Идемпотентно (retry-safe).
+  publish:
+    needs: [validate, build-and-gate, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.1.2
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          path: bundles
+          merge-multiple: true
+
+      - name: Create annotated tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG="v$VERSION"
+          # идемпотентность: проверяем именно remote (tag может не быть local)
+          REMOTE_TAG="$(git ls-remote origin "refs/tags/$TAG" | head -1 | cut -f1)"
+          if [ -n "$REMOTE_TAG" ]; then
+            echo "info: тег $TAG уже существует ($REMOTE_TAG)"
+            if [ "$REMOTE_TAG" != "$TARGET_SHA" ]; then
+              echo "::error::тег $TAG уже существует и не указывает на $TARGET_SHA"
+              exit 1
+            fi
+          else
+            git tag -a "$TAG" "$TARGET_SHA" -m "Release v$VERSION"
+            git push origin "refs/tags/$TAG"
+            echo "info: создан annotated tag $TAG@$TARGET_SHA"
+          fi
+
+      - name: Create draft release (notes by generate-notes)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          if gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null; then
+            echo "info: релиз $TAG уже создан (draft или published) — пропускаем создание"
+          else
+            gh release create "$TAG" \
+              --target "$TARGET_SHA" \
+              --title "BeamNG Mod Downloader v$VERSION" \
+              --generate-notes \
+              ${{ inputs.prerelease && '--prerelease' || '--draft' }}
+            echo "info: создан релиз $TAG (draft)"
+          fi
+
+      - name: Build SHA256SUMS and upload assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          cd bundles
+          # Собираем реальные пути до любых манипуляций с каталогами.
+          mapfile -d '' assets < <(find . -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+            -o -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \) -print0 | sort -z)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::нет asset'ов для загрузки"
+            exit 1
+          fi
+          # Basenames уникальны между bundle-типами; на GitHub assets плоские.
+          for a in "${assets[@]}"; do
+            sha256sum "$a" | sed -E 's#  .*/#  #'
+          done > "${VERSION}_SHA256SUMS.txt"
+          echo "--- ${VERSION}_SHA256SUMS.txt ---"
+          cat "${VERSION}_SHA256SUMS.txt"
+          # self-проверка на плоском каталоге копий
+          mkdir -p verify
+          for a in "${assets[@]}"; do cp "$a" verify/; done
+          (cd verify && sha256sum -c "../${VERSION}_SHA256SUMS.txt")
+          echo "SHA256SUMS: проверено OK"
+          gh release upload "$TAG" "${assets[@]}" "${VERSION}_SHA256SUMS.txt" --clobber
+          echo "загружено asset'ов: ${#assets[@]} + SHA256SUMS"
+
+      - name: Publish release
+        if: ${{ !inputs.prerelease }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq '.isDraft')"
+          if [ "$IS_DRAFT" = "true" ]; then
+            gh release edit "$TAG" --draft=false
+          fi
+          echo "relizepublish: $TAG опубликован"
+
+      - name: Mark prerelease
+        if: ${{ inputs.prerelease }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          gh release edit "v$VERSION" --prerelease --draft=false
+          echo "relizepublish: $VERSION отмечен как prerelease и опубликован"

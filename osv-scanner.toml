@@ -35,5 +35,5 @@ ignoreUntil = "2026-12-31T00:00:00Z"
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0429"
-reason = "glib: version pinned in Cargo.lock; scheduled review 2026-12-31"
+reason = "glib 0.18.5 (pinned in Cargo.lock): transitive via GTK/WKWebView stack, path beamng-mod-downloader -> webkit2gtk/gtk/soup3 -> glib. Not directly usable by attacker; Tauri 2 pins glib; fix follows upstream tauri v2 bump (glib >=0.20). Mitigation/review target 2026-12-31."
 ignoreUntil = "2026-12-31T00:00:00Z"

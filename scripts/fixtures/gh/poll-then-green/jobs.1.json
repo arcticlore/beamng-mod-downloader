@@ -1,0 +1,16 @@
+[
+ {"name":"fmt","status":"completed","conclusion":"success"},
+ {"name":"test","status":"completed","conclusion":"success"},
+ {"name":"clippy","status":"completed","conclusion":"success"},
+ {"name":"tsc","status":"completed","conclusion":"success"},
+ {"name":"frontend-build","status":"completed","conclusion":"success"},
+ {"name":"frontend-test","status":"completed","conclusion":"success"},
+ {"name":"npm-audit","status":"completed","conclusion":"success"},
+ {"name":"cargo-deny","status":"completed","conclusion":"success"},
+ {"name":"version-consistency","status":"completed","conclusion":"success"},
+ {"name":"tauri-config","status":"completed","conclusion":"success"},
+ {"name":"packaging-static","status":"completed","conclusion":"success"},
+ {"name":"bundle (ubuntu-22.04, --bundles appimage,deb,rpm, linux)","status":"completed","conclusion":"success"},
+ {"name":"bundle (windows-latest, --bundles nsis,msi, windows)","status":"completed","conclusion":"success"},
+ {"name":"bundle (macos-latest, macos)","status":"completed","conclusion":"success"}
+]
