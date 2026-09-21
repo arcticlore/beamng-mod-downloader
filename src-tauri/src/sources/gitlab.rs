@@ -159,7 +159,6 @@ fn pick_zip_asset(releases: &[serde_json::Value]) -> Option<ReleaseAsset> {
                     if fname.to_ascii_lowercase().ends_with(".zip") {
                         return Some(ReleaseAsset {
                             zip_url: u.to_string(),
-                            name: fname.to_string(),
                             published: created,
                         });
                     }
