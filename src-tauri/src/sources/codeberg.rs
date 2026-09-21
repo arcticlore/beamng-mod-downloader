@@ -56,7 +56,8 @@ async fn fetch(client: &reqwest::Client, url: &str) -> Result<String, SourceErro
 
 fn map_err(e: reqwest::Error, url: &str) -> SourceError {
     if let Some(status) = e.status() {
-        if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+        if status == reqwest::StatusCode::FORBIDDEN
+            || status == reqwest::StatusCode::TOO_MANY_REQUESTS
         {
             return SourceError::Unavailable(format!(
                 "Codeberg ограничил частоту запросов. URL: {url}"
@@ -230,9 +231,8 @@ async fn latest_release(
     if let Some(cached) = cached_release(full_name) {
         return Ok(cached);
     }
-    let url = format!(
-        "{API}/repos/{full_name}/releases?limit=1&draft=false&prerelease=false&page=1"
-    );
+    let url =
+        format!("{API}/repos/{full_name}/releases?limit=1&draft=false&prerelease=false&page=1");
     let body = fetch(client, &url).await?;
     let raw: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| SourceError::Parse(format!("Codeberg ответил не JSON: {e}")))?;
@@ -311,10 +311,7 @@ mod tests {
 
     #[test]
     fn repo_from_key_parses_codeberg_urls() {
-        assert_eq!(
-            repo_from_key("https://codeberg.org/o/r").unwrap(),
-            "o/r"
-        );
+        assert_eq!(repo_from_key("https://codeberg.org/o/r").unwrap(), "o/r");
         assert_eq!(
             repo_from_key("https://codeberg.org/o/r/releases/tag/1.0").unwrap(),
             "o/r"

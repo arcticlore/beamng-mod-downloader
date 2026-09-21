@@ -1,8 +1,8 @@
 pub mod beamngforum;
 pub mod beamngweb;
 pub mod codeberg;
-pub mod gitlab;
 pub mod github;
+pub mod gitlab;
 pub mod registry;
 pub mod worldofmods;
 

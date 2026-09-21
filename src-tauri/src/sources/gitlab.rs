@@ -1,6 +1,6 @@
 use crate::models::{ModDetail, ModItem, ModSearchResult, SourceCategory};
 use crate::sources::SourceError;
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
@@ -73,9 +73,7 @@ async fn fetch_with_headers(
         .get("x-next-page")
         .and_then(|v| v.to_str().ok())
         .map(ToOwned::to_owned);
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| map_err(e, url))?;
+    let resp = resp.error_for_status().map_err(|e| map_err(e, url))?;
     let body = resp
         .text()
         .await
@@ -128,7 +126,11 @@ impl Project {
         }
     }
     fn published(&self) -> String {
-        self.last_activity_at.split('T').next().unwrap_or("").to_string()
+        self.last_activity_at
+            .split('T')
+            .next()
+            .unwrap_or("")
+            .to_string()
     }
 }
 
@@ -243,11 +245,18 @@ pub async fn search(
     for p in projects.iter().take(ENRICH_LIMIT) {
         match latest_release(client, &p.path_with_namespace).await {
             Ok(_) => items.push(item(p)),
-            Err(e) => log::debug!("gitlab: пропуск {} без релиза/zip: {e}", p.path_with_namespace),
+            Err(e) => log::debug!(
+                "gitlab: пропуск {} без релиза/zip: {e}",
+                p.path_with_namespace
+            ),
         }
     }
 
-    let total_pages = if next.is_some() { page.max(1) + 1 } else { page.max(1) };
+    let total_pages = if next.is_some() {
+        page.max(1) + 1
+    } else {
+        page.max(1)
+    };
     Ok(ModSearchResult {
         items,
         total_pages,
@@ -269,8 +278,9 @@ async fn latest_release(client: &reqwest::Client, path: &str) -> Result<ReleaseA
     let releases = raw
         .as_array()
         .ok_or_else(|| SourceError::Parse("тело releases не массив".to_string()))?;
-    let asset = pick_zip_asset(releases)
-        .ok_or_else(|| SourceError::Unavailable(format!("у {path} нет zip-ассета в последнем релизе")))?;
+    let asset = pick_zip_asset(releases).ok_or_else(|| {
+        SourceError::Unavailable(format!("у {path} нет zip-ассета в последнем релизе"))
+    })?;
     cache_release(path, asset.clone());
     Ok(asset)
 }
@@ -291,12 +301,16 @@ fn cache_release(path: &str, asset: ReleaseAsset) {
 fn repo_from_key(key: &str) -> Result<String, SourceError> {
     let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() < 4 || parts[1] != "gitlab.com" {
-        return Err(SourceError::Parse(format!("не похоже на ссылку GitLab: {key}")));
+        return Err(SourceError::Parse(format!(
+            "не похоже на ссылку GitLab: {key}"
+        )));
     }
     let owner = parts[2];
     let repo = parts[3];
     if owner.is_empty() || repo.is_empty() {
-        return Err(SourceError::Parse(format!("не похоже на ссылку GitLab: {key}")));
+        return Err(SourceError::Parse(format!(
+            "не похоже на ссылку GitLab: {key}"
+        )));
     }
     Ok(format!("{owner}/{repo}"))
 }
@@ -336,10 +350,7 @@ mod tests {
 
     #[test]
     fn repo_from_key_parses_gitlab_urls() {
-        assert_eq!(
-            repo_from_key("https://gitlab.com/o/r").unwrap(),
-            "o/r"
-        );
+        assert_eq!(repo_from_key("https://gitlab.com/o/r").unwrap(), "o/r");
         assert_eq!(
             repo_from_key("https://gitlab.com/o/r/-/releases/tag/1.0").unwrap(),
             "o/r"
@@ -372,7 +383,8 @@ mod tests {
 
     #[test]
     fn pick_zip_none_when_no_zip_link() {
-        let json = r#"[{"assets":{"links":[{"direct_asset_url":"https://gitlab.com/o/r/x.tar.gz"}]}}]"#;
+        let json =
+            r#"[{"assets":{"links":[{"direct_asset_url":"https://gitlab.com/o/r/x.tar.gz"}]}}]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         assert!(pick_zip_asset(&val).is_none());
     }

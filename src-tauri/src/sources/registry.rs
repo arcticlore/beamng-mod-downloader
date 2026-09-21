@@ -107,9 +107,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             enabled_by_default: false,
             legacy_default: false,
             homepage: "https://gitlab.com/explore/projects/topics/beamng".into(),
-            terms_or_policy_url: Some(
-                "https://about.gitlab.com/terms/".into(),
-            ),
+            terms_or_policy_url: Some("https://about.gitlab.com/terms/".into()),
             warning: None,
             install_mode: InstallMode::ModsZip,
             auth: SourceAuth::None,
@@ -126,9 +124,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             enabled_by_default: false,
             legacy_default: false,
             homepage: "https://codeberg.org/explore/topics/beamng".into(),
-            terms_or_policy_url: Some(
-                "https://codeberg.org/legal/terms".into(),
-            ),
+            terms_or_policy_url: Some("https://codeberg.org/legal/terms".into()),
             warning: None,
             install_mode: InstallMode::ModsZip,
             auth: SourceAuth::None,
