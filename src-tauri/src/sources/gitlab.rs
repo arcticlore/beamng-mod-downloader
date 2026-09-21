@@ -57,7 +57,7 @@ fn encode_path(path: &str) -> String {
     utf8_percent_encode(path, GITLAB_PATH_CHARS).to_string()
 }
 
-fn fetch_with_headers(
+async fn fetch_with_headers(
     client: &reqwest::Client,
     url: &str,
 ) -> Result<(String, Option<String>), SourceError> {
