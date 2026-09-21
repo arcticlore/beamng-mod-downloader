@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCategories, searchMods } from "../api";
+import { useSources } from "../SourcesContext";
+import { dedupById, resolveActiveSources } from "../sources";
 import {
   BROWSER_SORTS,
   findSimilarInstalled,
-  installedFileName,
   type DownloadState,
   type ModItem,
   type SourceCategory,
 } from "../types";
 import { ModCard } from "./ModCard";
 
-const AGGREGATE_SOURCES = ["worldofmods", "beamngweb", "github"];
+/** Политика глубины агрегации по нескольким источникам — не «список источников». */
 const AGG_DEPTH_MAX = 3;
 
 function dateOf(published: string | null): number {
@@ -25,7 +26,6 @@ function popOf(m: ModItem): number {
 }
 
 interface Props {
-  source: string;
   downloads: Record<string, DownloadState>;
   installedNames: Set<string>;
   installedList: { filename: string; path: string }[];
@@ -35,7 +35,6 @@ interface Props {
 }
 
 export function ModsBrowser({
-  source,
   downloads,
   installedNames,
   installedList,
@@ -43,6 +42,20 @@ export function ModsBrowser({
   onInstall,
   onInfo,
 }: Props) {
+  const { registry, selection, labelOf, filenameFor } = useSources();
+
+  const activeSources = useMemo(() => {
+    if (!selection) return [];
+    return resolveActiveSources(registry, selection.enabled, selection.selected);
+  }, [registry, selection]);
+
+  const activeKey = activeSources.join(",");
+  const categoriesDescriptor = useMemo(() => {
+    return activeSources.length === 1
+      ? registry.find((d) => d.id === activeSources[0])
+      : undefined;
+  }, [registry, activeSources]);
+
   const [items, setItems] = useState<ModItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -53,12 +66,29 @@ export function ModsBrowser({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const [aggDepth, setAggDepth] = useState(1);
   const [aggMore, setAggMore] = useState(false);
+  const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set());
+
+  const seqRef = useRef(0);
+
+  const single = activeSources.length === 1;
+  const multi = activeSources.length > 1;
 
   useEffect(() => {
-    getCategories(source).then(setCategories).catch(() => setCategories([]));
-  }, [source]);
+    if (!categoriesDescriptor) {
+      setCategories([]);
+      return;
+    }
+    if (categoriesDescriptor.capabilities.categories) {
+      getCategories(categoriesDescriptor.id)
+        .then(setCategories)
+        .catch(() => setCategories([]));
+    } else {
+      setCategories([]);
+    }
+  }, [categoriesDescriptor]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -67,87 +97,94 @@ export function ModsBrowser({
 
   const load = useCallback(
     async (
-      src: string,
+      srcs: string[],
       cat: string,
       pg: number,
       q: string,
       ord: string,
       depth: number,
     ) => {
+      const seq = ++seqRef.current;
       setLoading(true);
       setError(null);
+      setPartialErrors([]);
       try {
-        if (src === "all") {
-          const merged: ModItem[] = [];
-          const seen = new Set<string>();
-          let anyOk = false;
-          let more = false;
-          await Promise.all(
-            AGGREGATE_SOURCES.map(async (s) => {
-              try {
-                const pages = Math.max(1, Math.min(depth, AGG_DEPTH_MAX));
-                const res = await Promise.all(
-                  Array.from({ length: pages }, async (_, i) => {
-                    try {
-                      return await searchMods(s, q || null, null, i + 1, ord);
-                    } catch (e) {
-                      console.warn(`источник ${s} (стр. ${i + 1}) недоступен:`, e);
-                      return null;
-                    }
-                  }),
-                );
-                for (const r of res) {
-                  if (!r) continue;
-                  anyOk = true;
-                  if (r.totalPages > 1) more = true;
-                  for (const it of r.items) {
-                    if (!seen.has(it.id)) {
-                      seen.add(it.id);
-                      merged.push(it);
-                    }
-                  }
-                }
-              } catch (e) {
-                console.warn(`источник ${s} недоступен во вкладке «Все»:`, e);
-              }
-            }),
-          );
-          if (!anyOk) throw new Error("все источники сейчас недоступны");
-          setItems(merged);
-          setAggMore(more);
-          setTotalPages(1);
-        } else {
+        if (srcs.length === 1) {
           const res = await searchMods(
-            src,
+            srcs[0],
             q || null,
             cat === "all" ? null : cat,
             pg,
             ord,
           );
+          if (seq !== seqRef.current) return;
           setItems(res.items);
           setTotalPages(res.totalPages || 1);
+        } else if (srcs.length > 1) {
+          const merged: ModItem[] = [];
+          const errors: string[] = [];
+          const pages = Math.max(1, Math.min(depth, AGG_DEPTH_MAX));
+          let maxTotal = 1;
+          await Promise.all(
+            srcs.map(async (s) => {
+              let srcOk = false;
+              try {
+                for (let i = 1; i <= pages; i++) {
+                  const r = await searchMods(s, q || null, null, i, ord);
+                  srcOk = true;
+                  if (r.totalPages > maxTotal) maxTotal = r.totalPages;
+                  if (r.items) merged.push(...r.items);
+                }
+              } catch (e) {
+                console.warn(`источник ${s} ${srcOk ? "частично" : ""} недоступен:`, e);
+                errors.push(`${labelOf(s)}: ${String(e)}`);
+              }
+            }),
+          );
+          if (seq !== seqRef.current) return;
+          if (merged.length === 0 && errors.length === srcs.length) {
+            throw new Error("все источники сейчас недоступны");
+          }
+          setItems(dedupById(merged));
+          setPartialErrors(errors);
+          setAggMore(maxTotal > pages);
+          setTotalPages(1);
+        } else {
+          setItems([]);
+          setTotalPages(1);
         }
       } catch (e) {
-        setError(String(e));
-        setItems([]);
+        if (seq === seqRef.current) {
+          setError(String(e));
+          setItems([]);
+        }
       } finally {
-        setLoading(false);
+        if (seq === seqRef.current) setLoading(false);
       }
     },
-    [],
+    [labelOf],
   );
 
   useEffect(() => {
     setPage(1);
     setAggDepth(1);
-  }, [source, category, debouncedQuery, sort]);
+    setHiddenSources(new Set());
+    setAggMore(false);
+    setCategory("all");
+  }, [activeKey]);
 
   useEffect(() => {
-    load(source, category, page, debouncedQuery, sort, aggDepth);
-  }, [source, category, page, debouncedQuery, sort, aggDepth, load]);
+    setPage(1);
+    setAggDepth(1);
+    setAggMore(false);
+  }, [category, debouncedQuery, sort]);
+
+  useEffect(() => {
+    load(activeSources, category, page, debouncedQuery, sort, aggDepth);
+  }, [activeSources, activeKey, category, page, debouncedQuery, sort, aggDepth, load]);
 
   const visible = useMemo(() => {
-    let list = items;
+    let list = items.filter((m) => !hiddenSources.has(m.source));
     if (debouncedQuery) {
       const q = debouncedQuery.toLowerCase();
       list = list.filter((m) => m.name.toLowerCase().includes(q));
@@ -155,16 +192,34 @@ export function ModsBrowser({
     if (sort === "name") {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name, "ru"));
     } else if (sort === "updated") {
-      list = [...list].sort(
-        (a, b) => dateOf(b.published) - dateOf(a.published),
-      );
+      list = [...list].sort((a, b) => dateOf(b.published) - dateOf(a.published));
     } else if (sort === "popularity") {
       list = [...list].sort((a, b) => popOf(b) - popOf(a));
     } else if (sort === "size") {
       list = [...list].sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0));
     }
     return list;
-  }, [items, debouncedQuery, sort]);
+  }, [items, hiddenSources, debouncedQuery, sort]);
+
+  const toggleHidden = useCallback((id: string) => {
+    setHiddenSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  if (activeSources.length === 0) {
+    return (
+      <div className="browser">
+        <div className="banner banner-hint">
+          Не выбран ни один источник для поиска. Откройте «Настройки → Источники» и
+          включите хотя бы один.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="browser">
@@ -175,18 +230,25 @@ export function ModsBrowser({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {categories.length > 1 && (
-          <select
-            className="category-select"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+        {single &&
+          categories.length > 1 &&
+          categoriesDescriptor?.capabilities.categories && (
+            <select
+              className="category-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          )}
+        {multi && (
+          <span className="browser-count">
+            {activeSources.length} источника, страниц: {aggDepth} / {AGG_DEPTH_MAX}
+          </span>
         )}
         <select
           className="category-select"
@@ -200,14 +262,45 @@ export function ModsBrowser({
             </option>
           ))}
         </select>
-        <span className="browser-count">{visible.length} модов</span>
+        {!multi && <span className="browser-count">{visible.length} модов</span>}
       </div>
+
+      {multi && (
+        <div className="source-chips">
+          {activeSources.map((id) => (
+            <button
+              key={id}
+              className={`source-chip ${hiddenSources.has(id) ? "source-chip-off" : ""}`}
+              onClick={() => toggleHidden(id)}
+              title={
+                hiddenSources.has(id)
+                  ? "Показать этот источник"
+                  : "Скрыть этот источник из результатов"
+              }
+            >
+              {labelOf(id)}
+              {hiddenSources.has(id) ? " (скрыт)" : ""}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <div className="banner banner-error">{error}</div>}
 
+      {partialErrors.length > 0 && (
+        <div className="banner banner-warn">
+          Некоторые источники вернули ошибки:
+          <ul className="banner-list">
+            {partialErrors.map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading && <div className="browser-loading">Загрузка…</div>}
 
-      {!loading && visible.length === 0 && !error && (
+      {!loading && visible.length === 0 && !error && partialErrors.length === 0 && (
         <div className="browser-empty">Моды не найдены</div>
       )}
 
@@ -216,9 +309,9 @@ export function ModsBrowser({
           <ModCard
             key={item.id}
             item={item}
-            installed={installedNames.has(installedFileName(item))}
+            installed={installedNames.has(filenameFor(item))}
             similar={
-              installedNames.has(installedFileName(item))
+              installedNames.has(filenameFor(item))
                 ? undefined
                 : findSimilarInstalled(item, installedList)
             }
@@ -229,7 +322,7 @@ export function ModsBrowser({
         ))}
       </div>
 
-      {source === "all" && aggMore && (
+      {multi && aggMore && (
         <div className="pagination">
           <button
             className="btn"
@@ -244,7 +337,7 @@ export function ModsBrowser({
         </div>
       )}
 
-      {source !== "all" && totalPages > 1 && (
+      {single && totalPages > 1 && (
         <div className="pagination">
           <button
             className="btn"

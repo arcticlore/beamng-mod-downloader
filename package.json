@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts",
+    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts tests/frontend/sources.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -1,5 +1,6 @@
 pub mod beamngweb;
 pub mod github;
+pub mod registry;
 pub mod worldofmods;
 
 use crate::models::{ModDetail, ModSearchResult, SourceCategory};
@@ -22,6 +23,27 @@ impl From<anyhow::Error> for SourceError {
     }
 }
 
+pub fn validate_source(source: &str) -> bool {
+    registry::is_known(source)
+}
+
+/// Допущен ли источник к сетевым запросам (enabled в config).
+/// Диспетчеры дергают его как защиту от неожиданных id и как единый гейт.
+pub fn can_query(enabled: &[String], source: &str) -> bool {
+    registry::can_query(enabled, source)
+}
+
+/// Если источник не в registry — возвращаем честную ошибку, а не match-провал.
+fn ensure_known(source: &str) -> Result<(), SourceError> {
+    if validate_source(source) {
+        Ok(())
+    } else {
+        Err(SourceError::Unavailable(format!(
+            "неизвестный источник `{source}`"
+        )))
+    }
+}
+
 pub async fn search(
     client: &reqwest::Client,
     source: &str,
@@ -30,12 +52,13 @@ pub async fn search(
     page: u32,
     order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
+    ensure_known(source)?;
     match source {
         "worldofmods" => worldofmods::search(client, query, category, page, order).await,
         "beamngweb" => beamngweb::search(client, query, category, page, order).await,
         "github" => github::search(client, query, category, page, order).await,
         other => Err(SourceError::Unavailable(format!(
-            "неизвестный источник `{other}`"
+            "источник `{other}` пока не реализован"
         ))),
     }
 }
@@ -46,12 +69,13 @@ pub async fn detail(
     mod_id: &str,
     key: &str,
 ) -> Result<ModDetail, SourceError> {
+    ensure_known(source)?;
     match source {
         "worldofmods" => worldofmods::detail(client, mod_id, key).await,
         "beamngweb" => beamngweb::detail(client, mod_id, key).await,
         "github" => github::detail(client, mod_id, key).await,
         other => Err(SourceError::Unavailable(format!(
-            "неизвестный источник `{other}`"
+            "источник `{other}` пока не реализован"
         ))),
     }
 }
@@ -63,25 +87,20 @@ pub async fn resolve_download(
     source: &str,
     key: &str,
 ) -> Result<(String, String, Option<String>), SourceError> {
+    ensure_known(source)?;
     match source {
         "worldofmods" => worldofmods::resolve_download(client, key).await,
         "beamngweb" => beamngweb::resolve_download(client, key).await,
         "github" => github::resolve_download(client, key).await,
         other => Err(SourceError::Unavailable(format!(
-            "неизвестный источник `{other}`"
+            "источник `{other}` пока не реализован"
         ))),
     }
 }
 
 pub fn categories(source: &str) -> Vec<SourceCategory> {
-    match source {
-        "worldofmods" => worldofmods::categories(),
-        "beamngweb" => beamngweb::categories(),
-        "github" => github::categories(),
-        _ => Vec::new(),
+    match registry::by_id(source) {
+        Some(d) => d.categories,
+        None => Vec::new(),
     }
-}
-
-pub fn validate_source(source: &str) -> bool {
-    matches!(source, "worldofmods" | "beamngweb" | "github")
 }
