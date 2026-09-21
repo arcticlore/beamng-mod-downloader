@@ -99,8 +99,6 @@ fn map_err(e: reqwest::Error, url: &str) -> SourceError {
 
 #[derive(Deserialize, Debug)]
 struct Project {
-    id: u64,
-    name: String,
     path_with_namespace: String,
     #[serde(default)]
     description: Option<String>,
@@ -137,7 +135,6 @@ impl Project {
 #[derive(Deserialize, Debug, Clone)]
 struct ReleaseAsset {
     zip_url: String,
-    name: String,
     published: Option<String>,
 }
 
