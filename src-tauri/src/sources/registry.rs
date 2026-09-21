@@ -14,8 +14,8 @@
 //! отвечает гейт `can_query` на всех tauri-командах, которые ходят в сеть.
 
 use crate::models::{
-    FilenameRule, InstallMode, SourceAuth, SourceCapabilities, SourceDescriptor,
-    SourceGroup, SourceStatus, TrustLevel,
+    FilenameRule, InstallMode, SourceAuth, SourceCapabilities, SourceDescriptor, SourceGroup,
+    SourceStatus, TrustLevel,
 };
 
 /// Порядок групп в UI (группировка в Source Picker).
