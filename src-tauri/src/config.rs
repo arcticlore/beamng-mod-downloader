@@ -133,7 +133,7 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(
                 dir.join("config.json"),
-                r#"{"modsFolder":"/x/mods","theme":"light","accent":"#ffffff"}"#,
+                r##"{"modsFolder":"/x/mods","theme":"light","accent":"#ffffff"}"##,
             )
             .unwrap();
             let cfg = Config::load();

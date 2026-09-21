@@ -313,7 +313,7 @@ async fn install_mod(
         req.source, req.mod_id, req.name
     );
     let mods_folder = {
-        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
         require_source_enabled(&cfg, &req.source)?;
         cfg.mods_folder
             .clone()
@@ -345,7 +345,7 @@ async fn update_mod(
 ) -> Result<String, String> {
     info!("обновление мода: {filename}");
     let mods_folder = {
-        let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
         let entry = ledger::load()
             .get(&filename)
             .cloned()

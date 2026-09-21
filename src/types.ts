@@ -182,7 +182,7 @@ export function sanitizeFileName(raw: string): string {
   return cleaned;
 }
 
-export const THEMES = [
+export function formatBytes(n: number | null | undefined): string {
   if (n == null) return "";
   if (n < 1024) return `${n} Б`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`;

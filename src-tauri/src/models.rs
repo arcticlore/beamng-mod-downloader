@@ -110,7 +110,7 @@ pub struct ModsFolderCandidate {
     pub exists: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceCategory {
     pub id: String,
