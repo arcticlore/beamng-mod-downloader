@@ -40,7 +40,13 @@ fn group_rank(group: &SourceGroup) -> u8 {
         .unwrap_or(99)
 }
 
-fn caps(search: bool, categories: bool, pagination: bool, detail: bool, direct: bool) -> SourceCapabilities {
+fn caps(
+    search: bool,
+    categories: bool,
+    pagination: bool,
+    detail: bool,
+    direct: bool,
+) -> SourceCapabilities {
     SourceCapabilities {
         search,
         categories,
@@ -88,7 +94,10 @@ pub fn registry() -> Vec<SourceDescriptor> {
             enabled_by_default: true,
             legacy_default: true,
             homepage: "https://github.com/topics/beamng".into(),
-            terms_or_policy_url: Some("https://docs.github.com/en/site-policy/github-terms/github-terms-of-service".into()),
+            terms_or_policy_url: Some(
+                "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service"
+                    .into(),
+            ),
             warning: None,
             install_mode: InstallMode::ModsZip,
             auth: SourceAuth::None,
@@ -145,7 +154,13 @@ pub fn is_known(id: &str) -> bool {
 pub fn default_enabled_ids(new_config: bool) -> Vec<String> {
     let mut ids: Vec<String> = registry()
         .into_iter()
-        .filter(|d| if new_config { d.enabled_by_default } else { d.legacy_default })
+        .filter(|d| {
+            if new_config {
+                d.enabled_by_default
+            } else {
+                d.legacy_default
+            }
+        })
         .map(|d| d.id)
         .collect();
     ids.sort();
@@ -174,7 +189,10 @@ mod tests {
     fn registry_has_legacy_sources() {
         let ids: Vec<String> = registry().into_iter().map(|d| d.id).collect();
         for expected in ["beamngweb", "github", "worldofmods"] {
-            assert!(ids.iter().any(|i| i == expected), "нет источника {expected}");
+            assert!(
+                ids.iter().any(|i| i == expected),
+                "нет источника {expected}"
+            );
         }
         assert!(registry().iter().all(|d| !d.categories.is_empty()));
     }

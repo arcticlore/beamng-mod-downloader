@@ -204,8 +204,8 @@ fn get_source_selection(state: State<'_, AppState>) -> SourceSelection {
     let cfg = state.config.lock().ok();
     let c = cfg.as_ref();
     SourceSelection {
-        enabled: c.map(Config::enabled_sources).unwrap_or_default(),
-        selected: c.and_then(|v| v.selected_sources.clone()),
+        enabled: c.map(|g| g.enabled_sources()).unwrap_or_default(),
+        selected: c.and_then(|g| g.selected_sources.clone()),
     }
 }
 

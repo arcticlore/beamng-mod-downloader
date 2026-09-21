@@ -177,8 +177,9 @@ export function dedupById(items: ModItem[]): ModItem[] {
   const seen = new Set<string>();
   const out: ModItem[] = [];
   for (const it of items) {
-    if (seen.has(it.id)) continue;
-    seen.add(it.id);
+    const key = `${it.source}:${it.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push(it);
   }
   return out;

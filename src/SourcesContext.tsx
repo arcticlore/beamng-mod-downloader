@@ -24,7 +24,7 @@ interface SourcesContextValue {
   error: string | null;
   refresh: () => Promise<void>;
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
-  setSelected: (ids: string[]) => Promise<void>;
+  setSelected: (ids: string[] | null) => Promise<void>;
   resetDefaults: () => Promise<void>;
   descriptorOf: (id: string) => SourceDescriptor | undefined;
   labelOf: (id: string) => string;
@@ -71,7 +71,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   );
 
   const setSelected = useCallback(
-    async (ids: string[]) => {
+    async (ids: string[] | null) => {
       await setSourceSelected(ids);
       await refresh();
     },

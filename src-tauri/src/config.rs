@@ -97,10 +97,8 @@ mod tests {
     /// Защита тестов: пишем config только во временный XDG_CONFIG_HOME.
     fn with_out_dirs<T>(name: &str, f: impl FnOnce() -> T) -> T {
         let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let tmp = std::env::temp_dir().join(format!(
-            "bmd-config-test-{}-{name}",
-            std::process::id()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("bmd-config-test-{}-{name}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
         let old_xdg = std::env::var("XDG_CONFIG_HOME").ok();
         // dirs::config_dir уважает XDG_CONFIG_HOME для Linux.
