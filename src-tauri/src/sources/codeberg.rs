@@ -78,8 +78,6 @@ struct SearchBody {
 
 #[derive(Deserialize, Debug)]
 struct Repo {
-    id: u64,
-    name: String,
     full_name: String,
     description: Option<String>,
     html_url: String,
@@ -113,7 +111,6 @@ impl Repo {
 #[derive(Deserialize, Debug, Clone)]
 struct ReleaseAsset {
     zip_url: String,
-    name: String,
     published: Option<String>,
 }
 
