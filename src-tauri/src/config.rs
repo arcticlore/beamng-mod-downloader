@@ -173,8 +173,10 @@ mod tests {
     #[test]
     fn explicit_selection_of_unknown_id_survives_save() {
         // Санитизация происходит на load; запись работает с уже чистыми списками.
-        let mut cfg = Config::default();
-        cfg.enabled_sources = Some(vec!["beamngweb".to_string()]);
+        let mut cfg = Config {
+            enabled_sources: Some(vec!["beamngweb".to_string()]),
+            ..Config::default()
+        };
         cfg.init_and_sanitize_sources(false);
         assert_eq!(cfg.enabled_sources(), vec!["beamngweb".to_string()]);
     }

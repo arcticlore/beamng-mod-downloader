@@ -14,7 +14,7 @@
 //! отвечает гейт `can_query` на всех tauri-командах, которые ходят в сеть.
 
 use crate::models::{
-    FilenameRule, InstallMode, SourceAuth, SourceCapabilities, SourceCategory, SourceDescriptor,
+    FilenameRule, InstallMode, SourceAuth, SourceCapabilities, SourceDescriptor,
     SourceGroup, SourceStatus, TrustLevel,
 };
 
@@ -56,13 +56,6 @@ fn caps(
         manual_download: false,
         checksums: false,
         update_detection: false,
-    }
-}
-
-fn cat(id: &str, label: &str) -> SourceCategory {
-    SourceCategory {
-        id: id.to_string(),
-        label: label.to_string(),
     }
 }
 

@@ -235,7 +235,7 @@ fn set_source_enabled(
         sel.sort();
         sel.dedup();
     }
-    info!("источник {}: enabled={}", source_id, enabled);
+    info!("источник {source_id}: enabled={enabled}");
     cfg.save().map_err(|e| {
         error!("не сохранить config: {e}");
         e.to_string()
