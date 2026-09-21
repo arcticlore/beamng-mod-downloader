@@ -100,6 +100,44 @@ pub fn registry() -> Vec<SourceDescriptor> {
             categories: crate::sources::github::categories(),
         },
         SourceDescriptor {
+            id: "gitlab".into(),
+            label: "GitLab-релизы".into(),
+            group: SourceGroup::Forges,
+            trust_level: TrustLevel::VerifiedForge,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://gitlab.com/explore/projects/topics/beamng".into(),
+            terms_or_policy_url: Some(
+                "https://about.gitlab.com/terms/".into(),
+            ),
+            warning: None,
+            install_mode: InstallMode::ModsZip,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::OwnerRepo,
+            capabilities: caps(true, true, true, true, true),
+            categories: crate::sources::gitlab::categories(),
+        },
+        SourceDescriptor {
+            id: "codeberg".into(),
+            label: "Codeberg".into(),
+            group: SourceGroup::Forges,
+            trust_level: TrustLevel::VerifiedForge,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://codeberg.org/explore/topics/beamng".into(),
+            terms_or_policy_url: Some(
+                "https://codeberg.org/legal/terms".into(),
+            ),
+            warning: None,
+            install_mode: InstallMode::ModsZip,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::OwnerRepo,
+            capabilities: caps(true, true, true, true, true),
+            categories: crate::sources::codeberg::categories(),
+        },
+        SourceDescriptor {
             id: "worldofmods".into(),
             label: "WorldOfMods".into(),
             group: SourceGroup::Community,
@@ -120,6 +158,28 @@ pub fn registry() -> Vec<SourceDescriptor> {
             filename_rule: FilenameRule::HtmlSlug,
             capabilities: caps(true, true, true, true, true),
             categories: crate::sources::worldofmods::categories(),
+        },
+        SourceDescriptor {
+            id: "beamngforum".into(),
+            label: "Форум BeamNG".into(),
+            group: SourceGroup::Official,
+            trust_level: TrustLevel::Official,
+            enabled_by_default: false,
+            legacy_default: true,
+            homepage: "https://www.beamng.com/community/".into(),
+            terms_or_policy_url: Some("https://www.beamng.com/help/terms-of-service/".into()),
+            warning: Some(
+                "На форуме нет надёжного API поиска и привязки к zip-ассетам. \
+                 Найти мод и ссылку на файл придётся вручную — приложение только \
+                 подсказывает, куда смотреть, и не устанавливает контент автоматически."
+                    .into(),
+            ),
+            install_mode: InstallMode::ManualExternal,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::HtmlSlug,
+            capabilities: caps(false, false, false, false, false),
+            categories: crate::sources::beamngforum::categories(),
         },
     ];
     list.sort_by(|a, b| {
