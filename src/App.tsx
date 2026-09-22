@@ -216,6 +216,7 @@ function AppInner() {
             cardSize={settings?.cardSize ?? "normal"}
             onInstall={onInstall}
             onInfo={setDetailItem}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
         )}
       </main>

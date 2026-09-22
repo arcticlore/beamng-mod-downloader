@@ -10,7 +10,16 @@ import {
 } from "../api";
 import { applyAppearance, ACCENT_PRESETS } from "../theme";
 import { useSources } from "../SourcesContext";
-import { applyPreset, groupLabel, sortByGroup, statusLabel, trustLabel } from "../sources";
+import {
+  applyPreset,
+  canonicalizeSelection,
+  groupLabel,
+  searchCapableEnabledIds,
+  sortByGroup,
+  statusLabel,
+  toggleSourceSelection,
+  trustLabel,
+} from "../sources";
 import type { AppSettings, ModsFolderCandidate, SourceGroup } from "../types";
 import { CARD_SIZES, INSTALLED_SORTS, THEMES } from "../types";
 
@@ -107,11 +116,15 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     [selection],
   );
   const selectedIsAll = selection?.selected === null;
+  const searchCapable = useMemo(
+    () => searchCapableEnabledIds(registry, selection?.enabled ?? []),
+    [registry, selection],
+  );
   const selectedSet = useMemo(() => {
     if (!selection) return new Set<string>();
-    if (selection.selected === null) return new Set(selection.enabled);
+    if (selection.selected === null) return new Set(searchCapable);
     return new Set(selection.selected);
-  }, [selection]);
+  }, [selection, searchCapable]);
   const anyEnabled = enabledSet.size > 0;
 
   const runSource = async (fn: () => Promise<void>, okText: string) => {
@@ -129,31 +142,26 @@ export function SettingsModal({ onClose, onChanged }: Props) {
   const toggleEnabled = (id: string) =>
     runSource(() => setEnabled(id, !enabledSet.has(id)), "Выбор источников сохранён");
 
-  const toggleSelected = (id: string) => {
-    const base = selectedIsAll ? [...enabledSet] : [...selectedSet];
-    const next = new Set(base);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    const allEnabled =
-      anyEnabled &&
-      [...enabledSet].every((i) => next.has(i)) &&
-      next.size === enabledSet.size;
-    return runSource(
-      () => setSelected(allEnabled ? null : [...next].sort()),
+  const toggleSelected = (id: string) =>
+    runSource(
+      () =>
+        setSelected(
+          toggleSourceSelection(
+            registry,
+            selection?.enabled ?? [],
+            selection?.selected ?? null,
+            id,
+          ),
+        ),
       "Поиск по источникам обновлён",
     );
-  };
 
-  const applyPresetNow = (preset: "recommended" | "official_forges" | "all_configured" | "clear") => {
+  const applyPresetNow = (
+    preset: "recommended" | "official_forges" | "all_configured" | "clear",
+  ) => {
     const list = applyPreset(preset, registry, [...enabledSet]);
-    const allEnabled =
-      anyEnabled &&
-      list.length === enabledSet.size &&
-      [...enabledSet].every((i) => list.includes(i));
-    if (allEnabled) {
-      return runSource(() => setSelected(null), "Поиск по всем включённым источникам");
-    }
-    return runSource(() => setSelected(list), "Пресет применён");
+    const next = canonicalizeSelection(searchCapable, list);
+    return runSource(() => setSelected(next), "Пресет применён");
   };
 
   const groups = useMemo(() => {
@@ -335,20 +343,28 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                               <label
                                 className="switch-label switch-label-secondary"
                                 title={
-                                  isEnabled
-                                    ? "Искать моды в этом источнике"
-                                    : "Сначала включите источник"
+                                  !d.capabilities.search
+                                    ? "Поиск не поддерживается — только ручная установка"
+                                    : isEnabled
+                                      ? "Искать моды в этом источнике"
+                                      : "Сначала включите источник"
                                 }
                               >
                                 <input
                                   type="checkbox"
-                                  checked={isEnabled && isSelected}
+                                  checked={isEnabled && d.capabilities.search && isSelected}
                                   className="switch-input"
-                                  disabled={!isEnabled || sourcesBusy}
+                                  disabled={
+                                    !isEnabled || !d.capabilities.search || sourcesBusy
+                                  }
                                   onChange={() => toggleSelected(d.id)}
                                 />
                                 <span className="switch-box" />
-                                <span>Поиск</span>
+                                <span>
+                                  {d.capabilities.search
+                                    ? "Поиск"
+                                    : "Поиск не поддерживается"}
+                                </span>
                               </label>
                             </div>
                             {!isEnabled && d.warning && (
@@ -362,8 +378,8 @@ export function SettingsModal({ onClose, onChanged }: Props) {
               )}
               {selectedIsAll && (
                 <div className="hint">
-                  Поиск активен во всех включённых источниках. Снимите «Поиск» у источника,
-                  чтобы искать в подмножестве.
+                  Поиск активен во всех включённых источниках с поддержкой поиска.
+                  Снимите «Поиск» у источника, чтобы искать в подмножестве.
                 </div>
               )}
             </>

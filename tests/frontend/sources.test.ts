@@ -3,9 +3,14 @@ import assert from "node:assert/strict";
 import type { SourceDescriptor, ModItem } from "../../src/types.ts";
 import {
   applyPreset,
+  canonicalizeSelection,
   dedupById,
   filenameFor,
+  filterSources,
   resolveActiveSources,
+  searchCapableEnabledIds,
+  sortByGroup,
+  toggleSourceSelection,
   urlHost,
 } from "../../src/sources.ts";
 
@@ -64,17 +69,41 @@ const REGISTRY: SourceDescriptor[] = [
     enabledByDefault: false,
     filenameRule: "html_slug",
   }),
+  regd({
+    id: "beamngforum",
+    label: "Форум BeamNG",
+    group: "official",
+    trustLevel: "official",
+    installMode: "manual_external",
+    capabilities: {
+      search: false,
+      categories: false,
+      pagination: false,
+      detail: false,
+      directZipDownload: false,
+      manualDownload: true,
+      checksums: false,
+      updateDetection: false,
+    },
+  }),
 ];
 
 const ALL = REGISTRY.map((d) => d.id);
 const ENABLED = ["beamngweb", "github", "worldofmods"];
+// search-capable включённые в порядке registry: без beamngforum (no-search).
+const SEARCH_CAPABLE_ENABLED = ["beamngweb", "github", "worldofmods"];
 
-test("resolveActiveSources: selected=null означает все enabled", () => {
+test("resolveActiveSources: selected=null означает все enabled search-capable", () => {
   assert.deepEqual(resolveActiveSources(REGISTRY, ENABLED, null), [
     "beamngweb",
     "github",
     "worldofmods",
   ]);
+  // enabled + manual/no-search не становится searchable:
+  assert.deepEqual(
+    resolveActiveSources(REGISTRY, [...ENABLED, "beamngforum"], null),
+    SEARCH_CAPABLE_ENABLED,
+  );
 });
 
 test("resolveActiveSources: явный выбор пересекается с enabled и упорядочен по registry", () => {
@@ -85,10 +114,16 @@ test("resolveActiveSources: явный выбор пересекается с en
   // disabled источник в selected не попадает — он никогда не запрашивается.
   assert.deepEqual(
     resolveActiveSources(REGISTRY, ENABLED, [ALL[0], ...ALL]),
-    ALL,
+    SEARCH_CAPABLE_ENABLED,
   );
   assert.deepEqual(resolveActiveSources(REGISTRY, ["github"], ["beamngweb"]), []);
   assert.deepEqual(resolveActiveSources(REGISTRY, ENABLED, []), []);
+  // stale selected / disabled / no-search id не становятся active:
+  assert.deepEqual(resolveActiveSources(REGISTRY, ENABLED, ["ghost", "beamngforum"]), []);
+  assert.deepEqual(
+    resolveActiveSources(REGISTRY, ENABLED, ["ghost", "beamngweb"]),
+    ["beamngweb"],
+  );
 });
 
 test("applyPreset: recommended — рекомендуемые из enabled", () => {
@@ -109,8 +144,82 @@ test("applyPreset: official_forges включает official и forges", () => {
 });
 
 test("applyPreset: all_configured и clear", () => {
-  assert.deepEqual(applyPreset("all_configured", REGISTRY, ENABLED), ALL);
+  assert.deepEqual(
+    applyPreset("all_configured", REGISTRY, ENABLED),
+    SEARCH_CAPABLE_ENABLED,
+  );
   assert.deepEqual(applyPreset("clear", REGISTRY, ENABLED), []);
+});
+
+test("applyPreset: presets исключают disabled и non-search-capable", () => {
+  const enabledWithForum = [...ENABLED, "beamngforum"];
+  // all_configured — только enabled ∩ search-capable (без beamngforum).
+  assert.deepEqual(
+    applyPreset("all_configured", REGISTRY, enabledWithForum),
+    SEARCH_CAPABLE_ENABLED,
+  );
+  // рекомендуемые не зависят от no-search источника.
+  assert.deepEqual(
+    applyPreset("recommended", REGISTRY, enabledWithForum),
+    ["beamngweb", "github"],
+  );
+  // disabled источник не участвует даже в all_configured.
+  assert.deepEqual(applyPreset("all_configured", REGISTRY, ["github"]), ["github"]);
+  assert.deepEqual(applyPreset("all_configured", REGISTRY, ["beamngforum"]), []);
+  assert.deepEqual(applyPreset("clear", REGISTRY, enabledWithForum), []);
+});
+
+test("toggleSourceSelection: selected=null → explicit subset; все → null", () => {
+  // из «все» снимаем github → явное подмножество (сортированное).
+  assert.deepEqual(
+    toggleSourceSelection(REGISTRY, ENABLED, null, "github"),
+    ["beamngweb", "worldofmods"],
+  );
+  // выбор последнего недостающего канонизируется обратно в null.
+  assert.equal(
+    toggleSourceSelection(REGISTRY, ENABLED, ["beamngweb", "worldofmods"], "github"),
+    null,
+  );
+  // no-search источник не трогается.
+  assert.equal(
+    toggleSourceSelection(REGISTRY, [...ENABLED, "beamngforum"], null, "beamngforum"),
+    null,
+  );
+});
+
+test("canonicalizeSelection: все → null; подмножество → sorted; пусто → []", () => {
+  assert.equal(canonicalizeSelection(SEARCH_CAPABLE_ENABLED, [...SEARCH_CAPABLE_ENABLED]), null);
+  assert.deepEqual(
+    canonicalizeSelection(SEARCH_CAPABLE_ENABLED, ["worldofmods", "beamngweb"]),
+    ["beamngweb", "worldofmods"],
+  );
+  assert.deepEqual(canonicalizeSelection(SEARCH_CAPABLE_ENABLED, []), []);
+});
+
+test("zero enabled / zero selected не падают", () => {
+  assert.deepEqual(resolveActiveSources(REGISTRY, [], null), []);
+  assert.deepEqual(resolveActiveSources(REGISTRY, [], []), []);
+  assert.deepEqual(searchCapableEnabledIds(REGISTRY, []), []);
+  assert.deepEqual(applyPreset("all_configured", REGISTRY, []), []);
+  assert.equal(toggleSourceSelection(REGISTRY, [], null, "github"), null);
+});
+
+test("filterSources: case-insensitive по label и id, сохраняет порядок групп", () => {
+  const all = sortByGroup(REGISTRY).map((d) => d.id);
+  assert.deepEqual(filterSources(REGISTRY, "").map((d) => d.id), all);
+  // case-insensitive по id.
+  assert.deepEqual(filterSources(REGISTRY, "GITHUB").map((d) => d.id), ["github"]);
+  // case-insensitive по label («форум beamng»).
+  assert.deepEqual(filterSources(REGISTRY, "форум beamng").map((d) => d.id), ["beamngforum"]);
+  // порядок групп/registry сохраняется при фильтрации.
+  const official = filterSources(REGISTRY, "beamng").map((d) => d.id);
+  assert.deepEqual(official, ["beamngweb", "beamngforum"]);
+});
+
+test("registry order/group order сохраняется", () => {
+  const ids = filterSources(REGISTRY, "").map((d) => d.id);
+  // official (beamngweb, beamngforum), forges (github), community (worldofmods).
+  assert.deepEqual(ids, ["beamngweb", "beamngforum", "github", "worldofmods"]);
 });
 
 test("dedupById: убирает повторы по source:id, сохраняя порядок", () => {

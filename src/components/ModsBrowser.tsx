@@ -10,6 +10,7 @@ import {
   type SourceCategory,
 } from "../types";
 import { ModCard } from "./ModCard";
+import { SourcePicker } from "./SourcePicker";
 
 /** Политика глубины агрегации по нескольким источникам — не «список источников». */
 const AGG_DEPTH_MAX = 3;
@@ -32,6 +33,7 @@ interface Props {
   cardSize: string;
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
+  onOpenSettings: () => void;
 }
 
 export function ModsBrowser({
@@ -41,8 +43,10 @@ export function ModsBrowser({
   cardSize,
   onInstall,
   onInfo,
+  onOpenSettings,
 }: Props) {
   const { registry, selection, labelOf, filenameFor } = useSources();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const activeSources = useMemo(() => {
     if (!selection) return [];
@@ -210,17 +214,6 @@ export function ModsBrowser({
     });
   }, []);
 
-  if (activeSources.length === 0) {
-    return (
-      <div className="browser">
-        <div className="banner banner-hint">
-          Не выбран ни один источник для поиска. Откройте «Настройки → Источники» и
-          включите хотя бы один.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="browser">
       <div className="browser-toolbar">
@@ -230,6 +223,23 @@ export function ModsBrowser({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <div className="source-picker-anchor">
+          <button
+            className={`btn btn-sm source-picker-trigger ${
+              activeSources.length === 0 ? "source-picker-trigger-zero" : ""
+            }`}
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((o) => !o)}
+          >
+            Источники: {activeSources.length}
+          </button>
+          <SourcePicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
         {single &&
           categories.length > 1 &&
           categoriesDescriptor?.capabilities.categories && (
@@ -264,6 +274,13 @@ export function ModsBrowser({
         </select>
         {!multi && <span className="browser-count">{visible.length} модов</span>}
       </div>
+
+      {activeSources.length === 0 && (
+        <div className="banner banner-hint">
+          Не выбран ни один источник для поиска. Откройте «Источники» рядом с
+          полем поиска или «Настройки → Источники» и включите хотя бы один.
+        </div>
+      )}
 
       {multi && (
         <div className="source-chips">
@@ -300,9 +317,11 @@ export function ModsBrowser({
 
       {loading && <div className="browser-loading">Загрузка…</div>}
 
-      {!loading && visible.length === 0 && !error && partialErrors.length === 0 && (
-        <div className="browser-empty">Моды не найдены</div>
-      )}
+      {!loading &&
+        activeSources.length > 0 &&
+        visible.length === 0 &&
+        !error &&
+        partialErrors.length === 0 && <div className="browser-empty">Моды не найдены</div>}
 
       <div className="mod-grid" data-size={cardSize}>
         {visible.map((item) => (
