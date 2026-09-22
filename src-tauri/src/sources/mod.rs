@@ -1,5 +1,8 @@
+pub mod beamngforum;
 pub mod beamngweb;
+pub mod codeberg;
 pub mod github;
+pub mod gitlab;
 pub mod registry;
 pub mod worldofmods;
 
@@ -57,6 +60,9 @@ pub async fn search(
         "worldofmods" => worldofmods::search(client, query, category, page, order).await,
         "beamngweb" => beamngweb::search(client, query, category, page, order).await,
         "github" => github::search(client, query, category, page, order).await,
+        "gitlab" => gitlab::search(client, query, category, page, order).await,
+        "codeberg" => codeberg::search(client, query, category, page, order).await,
+        "beamngforum" => beamngforum::search(client, query, category, page, order).await,
         other => Err(SourceError::Unavailable(format!(
             "источник `{other}` пока не реализован"
         ))),
@@ -74,6 +80,9 @@ pub async fn detail(
         "worldofmods" => worldofmods::detail(client, mod_id, key).await,
         "beamngweb" => beamngweb::detail(client, mod_id, key).await,
         "github" => github::detail(client, mod_id, key).await,
+        "gitlab" => gitlab::detail(client, mod_id, key).await,
+        "codeberg" => codeberg::detail(client, mod_id, key).await,
+        "beamngforum" => beamngforum::detail(client, mod_id, key).await,
         other => Err(SourceError::Unavailable(format!(
             "источник `{other}` пока не реализован"
         ))),
@@ -92,6 +101,9 @@ pub async fn resolve_download(
         "worldofmods" => worldofmods::resolve_download(client, key).await,
         "beamngweb" => beamngweb::resolve_download(client, key).await,
         "github" => github::resolve_download(client, key).await,
+        "gitlab" => gitlab::resolve_download(client, key).await,
+        "codeberg" => codeberg::resolve_download(client, key).await,
+        "beamngforum" => beamngforum::resolve_download(client, key).await,
         other => Err(SourceError::Unavailable(format!(
             "источник `{other}` пока не реализован"
         ))),

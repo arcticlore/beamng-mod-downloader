@@ -100,6 +100,40 @@ pub fn registry() -> Vec<SourceDescriptor> {
             categories: crate::sources::github::categories(),
         },
         SourceDescriptor {
+            id: "gitlab".into(),
+            label: "GitLab-релизы".into(),
+            group: SourceGroup::Forges,
+            trust_level: TrustLevel::VerifiedForge,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://gitlab.com/explore/projects/topics/beamng".into(),
+            terms_or_policy_url: Some("https://about.gitlab.com/terms/".into()),
+            warning: None,
+            install_mode: InstallMode::ModsZip,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::OwnerRepo,
+            capabilities: caps(true, true, true, true, true),
+            categories: crate::sources::gitlab::categories(),
+        },
+        SourceDescriptor {
+            id: "codeberg".into(),
+            label: "Codeberg".into(),
+            group: SourceGroup::Forges,
+            trust_level: TrustLevel::VerifiedForge,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://codeberg.org/explore/topics/beamng".into(),
+            terms_or_policy_url: Some("https://codeberg.org/legal/terms".into()),
+            warning: None,
+            install_mode: InstallMode::ModsZip,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::OwnerRepo,
+            capabilities: caps(true, true, true, true, true),
+            categories: crate::sources::codeberg::categories(),
+        },
+        SourceDescriptor {
             id: "worldofmods".into(),
             label: "WorldOfMods".into(),
             group: SourceGroup::Community,
@@ -120,6 +154,28 @@ pub fn registry() -> Vec<SourceDescriptor> {
             filename_rule: FilenameRule::HtmlSlug,
             capabilities: caps(true, true, true, true, true),
             categories: crate::sources::worldofmods::categories(),
+        },
+        SourceDescriptor {
+            id: "beamngforum".into(),
+            label: "Форум BeamNG".into(),
+            group: SourceGroup::Official,
+            trust_level: TrustLevel::Official,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://www.beamng.com/community/".into(),
+            terms_or_policy_url: Some("https://www.beamng.com/help/terms-of-service/".into()),
+            warning: Some(
+                "На форуме нет надёжного API поиска и привязки к zip-ассетам. \
+                 Найти мод и ссылку на файл придётся вручную — приложение только \
+                 подсказывает, куда смотреть, и не устанавливает контент автоматически."
+                    .into(),
+            ),
+            install_mode: InstallMode::ManualExternal,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::HtmlSlug,
+            capabilities: caps(false, false, false, false, false),
+            categories: crate::sources::beamngforum::categories(),
         },
     ];
     list.sort_by(|a, b| {
@@ -192,19 +248,24 @@ mod tests {
 
     #[test]
     fn default_sets_respect_new_vs_legacy() {
+        // default_enabled_ids сортирует — сравниваем точные множества.
         let new_cfg = default_enabled_ids(true);
         let legacy = default_enabled_ids(false);
-        // Новые конфиги: официальные + forges, без WorldOfMods.
-        assert!(new_cfg.contains(&"beamngweb".to_string()));
-        assert!(new_cfg.contains(&"github".to_string()));
-        assert!(!new_cfg.contains(&"worldofmods".to_string()));
-        // Миграция старых конфигов сохраняет прежний набор.
-        assert!(legacy.contains(&"beamngweb".to_string()));
-        assert!(legacy.contains(&"github".to_string()));
-        assert!(legacy.contains(&"worldofmods".to_string()));
-        // Рекомендуемые источники stable-упорядочены.
-        let sorted = new_cfg.clone();
-        assert_eq!(sorted, new_cfg);
+        // Новые конфиги: ровно рекомендуемый набор (без WorldOfMods).
+        assert_eq!(new_cfg, ["beamngweb", "github"]);
+        // Миграция 0.2.x: ровно прежний набор — ничего лишнего.
+        assert_eq!(legacy, ["beamngweb", "github", "worldofmods"]);
+        // Источники, появившиеся после 0.2.x, не включаются автоматически.
+        for id in ["gitlab", "codeberg", "beamngforum"] {
+            assert!(
+                !new_cfg.iter().any(|e| e == id),
+                "новый конфиг не должен включать {id}"
+            );
+            assert!(
+                !legacy.iter().any(|e| e == id),
+                "миграция 0.2.x не должна включать {id}"
+            );
+        }
     }
 
     #[test]
