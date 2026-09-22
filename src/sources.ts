@@ -95,8 +95,9 @@ export function sortByGroup(registry: SourceDescriptor[]): SourceDescriptor[] {
 
 /**
  * Активные для поиска источники: selected == null означает «все enabled».
- * Результат пересекается с enabled (disabled не запрашивается никогда) и
- * упорядочивается по registry.
+ * Результат пересекается с enabled (disabled не запрашивается никогда) и с
+ * `capabilities.search` (manual/link-only источник не становится searchable),
+ * затем упорядочивается по registry.
  */
 export function resolveActiveSources(
   registry: SourceDescriptor[],
@@ -106,33 +107,97 @@ export function resolveActiveSources(
   const allowed = new Set(enabled);
   const chosen = selected === null ? enabled : selected;
   return sortByGroup(registry)
-    .map((d) => d.id)
-    .filter((id) => allowed.has(id) && chosen.includes(id));
+    .filter(
+      (d) =>
+        d.capabilities.search && allowed.has(d.id) && chosen.includes(d.id),
+    )
+    .map((d) => d.id);
 }
 
-/** Применяет quick-preset к заданному набору enabled-источников. */
+/**
+ * Все enabled и search-capable источники в порядке registry.
+ * База выбора поиска: presets и toggle работают только с этим intersection.
+ */
+export function searchCapableEnabledIds(
+  registry: SourceDescriptor[],
+  enabled: string[],
+): string[] {
+  const allowed = new Set(enabled);
+  return sortByGroup(registry)
+    .filter((d) => d.capabilities.search && allowed.has(d.id))
+    .map((d) => d.id);
+}
+
+/**
+ * Канонизация набора выбранных id: если он равен всем допустимым
+ * (search-capable enabled) — возвращает `null` («все»); иначе сортированный
+ * дедуплицированный список (ноль = `[]`).
+ */
+export function canonicalizeSelection(
+  searchCapable: string[],
+  ids: string[],
+): string[] | null {
+  const canon = [...new Set(ids)].sort();
+  const all = [...searchCapable].sort();
+  if (canon.length === all.length && all.every((v, i) => v === canon[i])) {
+    return null;
+  }
+  return canon;
+}
+
+/**
+ * Toggle поиска по источнику с учётом `selected=null`. Non-search-capable
+ * источники не трогаются. Возвращает `null`, когда результат равен всем
+ * допустимым, иначе explicit подмножество.
+ */
+export function toggleSourceSelection(
+  registry: SourceDescriptor[],
+  enabled: string[],
+  selected: string[] | null,
+  id: string,
+): string[] | null {
+  const desc = registry.find((d) => d.id === id);
+  if (!desc || !desc.capabilities.search) return selected;
+  const all = searchCapableEnabledIds(registry, enabled);
+  if (!all.includes(id)) return selected;
+  const base = selected === null ? all : selected.filter((i) => all.includes(i));
+  const next = new Set(base);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return canonicalizeSelection(all, [...next]);
+}
+
+/** Поиск/фильтр источников по label или id (case-insensitive), сохраняя порядок registry. */
+export function filterSources(
+  registry: SourceDescriptor[],
+  text: string,
+): SourceDescriptor[] {
+  const q = text.trim().toLowerCase();
+  const ordered = sortByGroup(registry);
+  if (!q) return ordered;
+  return ordered.filter(
+    (d) => d.label.toLowerCase().includes(q) || d.id.toLowerCase().includes(q),
+  );
+}
+
+/** Применяет quick-preset к enabled ∩ search-capable источникам. */
 export function applyPreset(
   preset: SourcePreset,
   registry: SourceDescriptor[],
   enabled: string[],
 ): string[] {
-  const allowed = new Set(enabled);
-  const ordered = sortByGroup(registry);
+  const ordered = sortByGroup(registry).filter(
+    (d) => d.capabilities.search && enabled.includes(d.id),
+  );
   switch (preset) {
     case "recommended":
-      return ordered
-        .filter((d) => d.enabledByDefault && allowed.has(d.id))
-        .map((d) => d.id);
+      return ordered.filter((d) => d.enabledByDefault).map((d) => d.id);
     case "official_forges":
       return ordered
-        .filter(
-          (d) =>
-            allowed.has(d.id) &&
-            (d.group === "official" || d.group === "forges"),
-        )
+        .filter((d) => d.group === "official" || d.group === "forges")
         .map((d) => d.id);
     case "all_configured":
-      return ordered.filter((d) => allowed.has(d.id)).map((d) => d.id);
+      return ordered.map((d) => d.id);
     case "clear":
       return [];
   }
