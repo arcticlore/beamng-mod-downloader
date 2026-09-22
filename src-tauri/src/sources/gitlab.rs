@@ -425,7 +425,10 @@ mod tests {
         ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
-        assert_eq!(a.zip_url, "https://gitlab.com/o/r/-/releases/1.0/downloads/mod.zip");
+        assert_eq!(
+            a.zip_url,
+            "https://gitlab.com/o/r/-/releases/1.0/downloads/mod.zip"
+        );
     }
 
     #[test]
@@ -487,7 +490,10 @@ mod tests {
         ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
-        assert_eq!(a.zip_url, "https://gitlab.com/o/r/-/releases/v1/downloads/mod.zip");
+        assert_eq!(
+            a.zip_url,
+            "https://gitlab.com/o/r/-/releases/v1/downloads/mod.zip"
+        );
     }
 
     #[test]
@@ -500,7 +506,10 @@ mod tests {
         ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
-        assert_eq!(a.zip_url, "https://gitlab.com/o/r/-/jobs/5/artifacts/raw/mod.zip");
+        assert_eq!(
+            a.zip_url,
+            "https://gitlab.com/o/r/-/jobs/5/artifacts/raw/mod.zip"
+        );
     }
 
     #[test]
@@ -517,7 +526,10 @@ mod tests {
         ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
-        assert_eq!(a.zip_url, "https://gitlab.com/o/r/-/releases/v2/downloads/mod.zip");
+        assert_eq!(
+            a.zip_url,
+            "https://gitlab.com/o/r/-/releases/v2/downloads/mod.zip"
+        );
     }
 
     #[test]
