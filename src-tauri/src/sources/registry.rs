@@ -161,7 +161,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             group: SourceGroup::Official,
             trust_level: TrustLevel::Official,
             enabled_by_default: false,
-            legacy_default: true,
+            legacy_default: false,
             homepage: "https://www.beamng.com/community/".into(),
             terms_or_policy_url: Some("https://www.beamng.com/help/terms-of-service/".into()),
             warning: Some(
@@ -248,19 +248,24 @@ mod tests {
 
     #[test]
     fn default_sets_respect_new_vs_legacy() {
+        // default_enabled_ids сортирует — сравниваем точные множества.
         let new_cfg = default_enabled_ids(true);
         let legacy = default_enabled_ids(false);
-        // Новые конфиги: официальные + forges, без WorldOfMods.
-        assert!(new_cfg.contains(&"beamngweb".to_string()));
-        assert!(new_cfg.contains(&"github".to_string()));
-        assert!(!new_cfg.contains(&"worldofmods".to_string()));
-        // Миграция старых конфигов сохраняет прежний набор.
-        assert!(legacy.contains(&"beamngweb".to_string()));
-        assert!(legacy.contains(&"github".to_string()));
-        assert!(legacy.contains(&"worldofmods".to_string()));
-        // Рекомендуемые источники stable-упорядочены.
-        let sorted = new_cfg.clone();
-        assert_eq!(sorted, new_cfg);
+        // Новые конфиги: ровно рекомендуемый набор (без WorldOfMods).
+        assert_eq!(new_cfg, ["beamngweb", "github"]);
+        // Миграция 0.2.x: ровно прежний набор — ничего лишнего.
+        assert_eq!(legacy, ["beamngweb", "github", "worldofmods"]);
+        // Источники, появившиеся после 0.2.x, не включаются автоматически.
+        for id in ["gitlab", "codeberg", "beamngforum"] {
+            assert!(
+                !new_cfg.iter().any(|e| e == id),
+                "новый конфиг не должен включать {id}"
+            );
+            assert!(
+                !legacy.iter().any(|e| e == id),
+                "миграция 0.2.x не должна включать {id}"
+            );
+        }
     }
 
     #[test]
