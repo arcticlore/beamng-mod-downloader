@@ -101,13 +101,9 @@ pub fn validate_url(url: &str) -> Result<(), String> {
         .any(|exact| host.eq_ignore_ascii_case(exact));
     if !suffix_ok && !exact_ok {
         return Err(format!(
-            "host `{host}` не входит в разрешённые домены ({}{})",
+            "host `{host}` не входит в разрешённые домены ({}; exact: {})",
             ALLOWED_HOST_SUFFIXES.join(", "),
-            if ALLOWED_EXACT_HOSTS.is_empty() {
-                String::new()
-            } else {
-                format!("; exact: {}", ALLOWED_EXACT_HOSTS.join(", "))
-            }
+            ALLOWED_EXACT_HOSTS.join(", ")
         ));
     }
     Ok(())
