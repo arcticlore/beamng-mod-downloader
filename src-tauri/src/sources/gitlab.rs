@@ -157,6 +157,11 @@ fn pick_zip_asset(releases: &[serde_json::Value]) -> Option<ReleaseAsset> {
                     .or_else(|| l.get("url"))
                     .and_then(|v| v.as_str());
                 if let Some(u) = url {
+                    if crate::urlguard::validate_gitlab_url(u).is_err() {
+                        // Внешний/недоверенный asset из release-метаданных
+                        // не выбирается (SSRF-gate, only-exact-host first-party).
+                        continue;
+                    }
                     let fname = u.rsplit('/').next().unwrap_or("");
                     if fname.to_ascii_lowercase().ends_with(".zip") {
                         return Some(ReleaseAsset {
@@ -340,6 +345,8 @@ pub async fn resolve_download(
 ) -> Result<(String, String, Option<String>), SourceError> {
     let path = repo_from_key(key)?;
     let asset = latest_release(client, &path).await?;
+    crate::urlguard::validate_gitlab_url(&asset.zip_url)
+        .map_err(|e| SourceError::Network(format!("SSRF-gate: {e}")))?;
     let zip_name = format!("{}.zip", path.replace('/', "-"));
     Ok((asset.zip_url, zip_name, asset.published))
 }
@@ -385,6 +392,35 @@ mod tests {
     fn pick_zip_none_when_no_zip_link() {
         let json =
             r#"[{"assets":{"links":[{"direct_asset_url":"https://gitlab.com/o/r/x.tar.gz"}]}}]"#;
+        let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
+        assert!(pick_zip_asset(&val).is_none());
+    }
+
+    #[test]
+    fn pick_zip_rejects_external_asset_urls() {
+        // Attacker-controlled внешний ZIP в release-метаданных не выбирается:
+        // хост не входит в exact-host allowlist GitLab.
+        let json = r#"[
+          {"created_at":"2026-03-01T10:00:00Z",
+           "assets":{"links":[
+             {"name":"evil","direct_asset_url":"https://github.com/evil/mod.zip"},
+             {"name":"evil2","direct_asset_url":"https://gitlab.com.evil.example/mod.zip"},
+             {"name":"good","direct_asset_url":"https://gitlab.com/o/r/-/releases/1.0/mod.zip"}
+           ]}}
+        ]"#;
+        let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
+        let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
+        assert_eq!(a.zip_url, "https://gitlab.com/o/r/-/releases/1.0/mod.zip");
+    }
+
+    #[test]
+    fn pick_zip_none_when_only_external_assets() {
+        let json = r#"[
+          {"assets":{"links":[
+            {"name":"evil","direct_asset_url":"https://evil-cdn.example/mod.zip"},
+            {"name":"evil2","direct_asset_url":"https://github.com/o/r/releases/download/v1/mod.zip"}
+          ]}}
+        ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         assert!(pick_zip_asset(&val).is_none());
     }
