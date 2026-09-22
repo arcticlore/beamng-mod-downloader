@@ -6,8 +6,10 @@
 //! - host не может быть IP-литералом (никаких 127.0.0.1, ::1, RFC1918, link-local,
 //!   metadata-адресов) — разрешены только доменные имена;
 //! - userinfo (user:pass@) запрещён;
-//! - домен обязан входить в allowlist по registrable-domain соответствию
-//!   (запись `beamng.com` покрывает и `beamng.com`, и `www.beamng.com`).
+//! - домен обязан входить в allowlist: исторические источники — по
+//!   registrable-domain соответствию (запись `beamng.com` покрывает и
+//!   `beamng.com`, и `www.beamng.com`); GitLab/Codeberg — строго exact-host
+//!   (только `gitlab.com` / `codeberg.org`, поддомены не разрешены).
 //!
 //! Гейт применяется в трёх местах:
 //! - `http::fetch_bytes` / `http::fetch_string` — страницы и API источников;
@@ -19,6 +21,11 @@
 //! редиректы с других доменов — поэтому РАЗРЕШЕНЫ r2.dev,
 //! r2.cloudflarestorage.com и githubusercontent.com).
 //!
+//! Отдельные source-scoped гейты (`validate_gitlab_url`/`validate_codeberg_url`)
+//! применяются адаптерами источников к release-ассетам ДО скачивания: внешний
+//! URL из attacker-controlled release-метаданных не пройдёт, даже если хост
+//! разрешён историческим суффиксом (например `github.com`).
+//!
 //! Ограничение: против DNS-ребinding на уровне hostname мы не делаем собственный
 //! DNS-резолв (это async); literal-IP заблокированы напрямую, что покрывает
 //! классические SSRF-векторы без потери функциональности.
@@ -26,6 +33,10 @@
 use reqwest::Url;
 
 /// Registrable-домены, с которых приложение может получать данные.
+/// Суффиксное соответствие покрывает и сам домен, и его поддомены.
+/// GitLab/Codeberg в этот список не входят — для них строгий exact-host
+/// allowlist (см. `ALLOWED_EXACT_HOSTS`), чтобы не открывать произвольные
+/// subdomain'ы вида `*.gitlab.com` / `*.codeberg.org`.
 const ALLOWED_HOST_SUFFIXES: &[&str] = &[
     "beamng.com",
     "github.com",
@@ -35,10 +46,20 @@ const ALLOWED_HOST_SUFFIXES: &[&str] = &[
     "r2.cloudflarestorage.com", // Cloudflare R2 storage endpoint
 ];
 
+/// Точные хосты форджей, разрешённые ГЛОБАЛЬНО (API, веб, релизы и
+/// редирект-хопы). Поддомены сюда не входят: только сам exact host.
+const ALLOWED_EXACT_HOSTS: &[&str] = &["gitlab.com", "codeberg.org"];
+
+/// Exact-host набор для first-party релизов GitLab.
+const GITLAB_EXACT_HOSTS: &[&str] = &["gitlab.com"];
+
+/// Exact-host набор для first-party релизов Codeberg.
+const CODEBERG_EXACT_HOSTS: &[&str] = &["codeberg.org"];
+
 /// Максимальное число редирект-хопов.
 pub const MAX_REDIRECTS: usize = 8;
 
-/// Возвращает ошибку, если URL нарушает транспортную политику.
+/// Возвращает ошибку, если URL нарушает транспортную политику allowlist-источников.
 pub fn validate_url(url: &str) -> Result<(), String> {
     let parsed = Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
     match parsed.scheme() {
@@ -72,17 +93,53 @@ pub fn validate_url(url: &str) -> Result<(), String> {
         }
     }
 
-    if !ALLOWED_HOST_SUFFIXES
+    let suffix_ok = ALLOWED_HOST_SUFFIXES
         .iter()
-        .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
-    {
+        .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")));
+    let exact_ok = ALLOWED_EXACT_HOSTS
+        .iter()
+        .any(|exact| host.eq_ignore_ascii_case(exact));
+    if !suffix_ok && !exact_ok {
         return Err(format!(
-            "host `{host}` не входит в разрешённые домены ({})",
-            ALLOWED_HOST_SUFFIXES.join(", ")
+            "host `{host}` не входит в разрешённые домены ({}; exact: {})",
+            ALLOWED_HOST_SUFFIXES.join(", "),
+            ALLOWED_EXACT_HOSTS.join(", ")
         ));
     }
-
     Ok(())
+}
+
+/// Source-scoped гейт для release-ассетов источников: транспортная политика
+/// (`validate_url`-уровень) плюс host обязан точно совпасть с одним из
+/// заданных exact-host'ов источника. Используется адаптерами источников ДО
+/// скачивания архива, чтобы attacker-controlled внешний URL из метаданных
+/// релиза не прошёл (даже если его хост разрешён историческим суффиксом).
+pub fn validate_source_url(url: &str, allowed_exact_hosts: &[&str]) -> Result<(), String> {
+    validate_url(url)?;
+    let parsed = Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("URL без host: `{url}`"))?;
+    if !allowed_exact_hosts
+        .iter()
+        .any(|exact| host.eq_ignore_ascii_case(exact))
+    {
+        return Err(format!(
+            "host `{host}` не входит в exact-host allowlist источника ({})",
+            allowed_exact_hosts.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+/// Source-scoped гейт для first-party релизов GitLab.
+pub fn validate_gitlab_url(url: &str) -> Result<(), String> {
+    validate_source_url(url, GITLAB_EXACT_HOSTS)
+}
+
+/// Source-scoped гейт для first-party релизов Codeberg.
+pub fn validate_codeberg_url(url: &str) -> Result<(), String> {
+    validate_source_url(url, CODEBERG_EXACT_HOSTS)
 }
 
 /// Custom redirect-политика reqwest: валидирует каждый хоп.
@@ -112,6 +169,30 @@ mod tests {
             "ожидался блокируемый URL: {url}"
         );
     }
+    fn gok(url: &str) {
+        assert!(
+            validate_gitlab_url(url).is_ok(),
+            "ожидался разрешённый GitLab URL: {url}"
+        );
+    }
+    fn gerr(url: &str) {
+        assert!(
+            validate_gitlab_url(url).is_err(),
+            "ожидался блокируемый GitLab URL: {url}"
+        );
+    }
+    fn cok(url: &str) {
+        assert!(
+            validate_codeberg_url(url).is_ok(),
+            "ожидался разрешённый Codeberg URL: {url}"
+        );
+    }
+    fn cerr(url: &str) {
+        assert!(
+            validate_codeberg_url(url).is_err(),
+            "ожидался блокируемый Codeberg URL: {url}"
+        );
+    }
 
     #[test]
     fn allows_expected_hosts() {
@@ -122,6 +203,73 @@ mod tests {
         ok("https://codeload.github.com/arcticlore/beamng-mod-downloader/zip/refs/heads/main");
         ok("https://www.worldofmods.com/mods/1/");
         ok("http://www.beamng.com/legacy-link");
+    }
+
+    #[test]
+    fn allows_gitlab_and_codeberg_exact_hosts() {
+        ok("https://gitlab.com/api/v4/projects?topic=beamng");
+        ok("https://gitlab.com/owner/repo/-/releases/1.0/mod.zip");
+        ok("https://codeberg.org/api/v1/repos/search?q=beamng");
+        ok("https://codeberg.org/owner/repo/releases/download/1.0/mod.zip");
+    }
+
+    #[test]
+    fn blocks_gitlab_and_codeberg_lookalike_hosts() {
+        err("https://gitlab.com.evil.example/api/v4/projects");
+        err("https://codeberg.org.evil.example/api/v1/repos/search");
+        err("https://evilgitlab.com/api/v4/projects");
+        err("https://evilcodeberg.org/api/v1/repos/search");
+        err("https://gitlab.com@evil.example/x");
+        err("https://codeberg.org@evil.example/x");
+        // exact-host: поддомены форджей не разрешены.
+        err("https://sub.gitlab.com/x");
+        err("https://sub.codeberg.org/x");
+        err("https://gitlab.io/x/");
+        err("https://pages.gitlab.io/x/y/");
+        err("https://codeberg.page/x/");
+    }
+
+    #[test]
+    fn source_scoped_gates_only_exact_hosts() {
+        gok("https://gitlab.com/owner/repo/-/releases/1.0/mod.zip");
+        gerr("https://codeberg.org/o/r/releases/download/v1/mod.zip");
+        gerr("https://github.com/o/r/releases/download/v1/mod.zip");
+        gerr("https://evilgitlab.com/mod.zip");
+        gerr("https://sub.gitlab.com/x");
+        cok("https://codeberg.org/owner/repo/releases/download/1.0/mod.zip");
+        cerr("https://gitlab.com/o/r/-/releases/1.0/mod.zip");
+        cerr("https://evilcodeberg.org/mod.zip");
+        cerr("https://sub.codeberg.org/x");
+        // Нарушения транспортной политики пробрасываются через source-scoped гейт.
+        gerr("https://gitlab.com:8443/x");
+        gerr("https://user:pass@gitlab.com/x");
+        cerr("https://codeberg.org:4443/x");
+        cerr("https://user:pass@codeberg.org/x");
+    }
+
+    #[test]
+    fn blocks_forbidden_schemes_and_host_shapes_in_source_gate() {
+        gerr("file:///etc/passwd");
+        gerr("gopher://gitlab.com/");
+        gerr("http://127.0.0.1/");
+        cerr("https://169.254.169.254/");
+        cerr("https://localhost/");
+        gerr("https://2130706433/");
+        gerr("https://0x7f000001/");
+        cerr("https://[::1]/");
+        gerr("https://gitlab.com.evil.example/api/v4/projects");
+        cerr("https://codeberg.org.evil.example/api/v1/repos/search");
+    }
+
+    #[test]
+    fn blocks_redirect_to_unapproved_hosts() {
+        // Редирект-хоп наружу за пределы exact-host/allowlist блокируется.
+        err("https://evil-cdn.example/mod.zip");
+        gerr("https://evil-cdn.example/mod.zip");
+        cerr("https://evil-cdn.example/mod.zip");
+        // Легитимный first-party хоп внутри exact-host проходит.
+        gok("https://gitlab.com/o/r/-/releases/1.0/mod.zip");
+        cok("https://codeberg.org/o/r/releases/download/1.0/mod.zip");
     }
 
     #[test]

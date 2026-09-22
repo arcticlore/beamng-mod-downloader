@@ -125,6 +125,11 @@ fn pick_zip_asset(body: &[serde_json::Value]) -> Option<ReleaseAsset> {
             for a in assets {
                 let url = a.get("browser_download_url").and_then(|v| v.as_str());
                 if let Some(u) = url {
+                    if crate::urlguard::validate_codeberg_url(u).is_err() {
+                        // Внешний/недоверенный asset из release-метаданных
+                        // не выбирается (SSRF-gate, only-exact-host first-party).
+                        continue;
+                    }
                     let fname = u.rsplit('/').next().unwrap_or("");
                     if fname.to_ascii_lowercase().ends_with(".zip") {
                         return Some(ReleaseAsset {
@@ -297,6 +302,8 @@ pub async fn resolve_download(
 ) -> Result<(String, String, Option<String>), SourceError> {
     let full = repo_from_key(key)?;
     let asset = latest_release(client, &full).await?;
+    crate::urlguard::validate_codeberg_url(&asset.zip_url)
+        .map_err(|e| SourceError::Network(format!("SSRF-gate: {e}")))?;
     let zip_name = format!("{}.zip", full.replace('/', "-"));
     Ok((asset.zip_url, zip_name, asset.published))
 }
@@ -335,6 +342,38 @@ mod tests {
     #[test]
     fn pick_zip_none_when_no_zip() {
         let json = r#"[{"assets":[{"browser_download_url":"https://codeberg.org/o/r/x.tar.gz"}]}]"#;
+        let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
+        assert!(pick_zip_asset(&val).is_none());
+    }
+
+    #[test]
+    fn pick_zip_rejects_external_asset_urls() {
+        // Attacker-controlled внешний ZIP в release-метаданных не выбирается:
+        // хост не входит в exact-host allowlist Codeberg.
+        let json = r#"[
+          {"published_at":"2026-02-02T00:00:00Z",
+           "assets":[
+             {"name":"evil","browser_download_url":"https://github.com/evil/mod.zip"},
+             {"name":"evil2","browser_download_url":"https://codeberg.org.evil.example/mod.zip"},
+             {"name":"good","browser_download_url":"https://codeberg.org/o/r/releases/download/v1.0/mod.zip"}
+           ]}
+        ]"#;
+        let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
+        let a = pick_zip_asset(&val).expect("должен выбрать first-party zip");
+        assert_eq!(
+            a.zip_url,
+            "https://codeberg.org/o/r/releases/download/v1.0/mod.zip"
+        );
+    }
+
+    #[test]
+    fn pick_zip_none_when_only_external_assets() {
+        let json = r#"[
+          {"assets":[
+            {"browser_download_url":"https://evil-cdn.example/mod.zip"},
+            {"browser_download_url":"https://github.com/o/r/releases/download/v1/mod.zip"}
+          ]}
+        ]"#;
         let val: Vec<serde_json::Value> = serde_json::from_str(json).unwrap();
         assert!(pick_zip_asset(&val).is_none());
     }
