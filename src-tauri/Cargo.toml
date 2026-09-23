@@ -1,6 +1,6 @@
 [package]
 name = "beamng-mod-downloader"
-version = "0.2.1"
+version = "0.3.0"
 description = "Кроссплатформенный установщик модов для BeamNG.drive"
 license = "MIT"
 edition = "2021"
