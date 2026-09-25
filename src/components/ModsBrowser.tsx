@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { ModCard } from "./ModCard";
 import { SourcePicker } from "./SourcePicker";
+import { useI18n } from "../i18n/LanguageContext";
 
 /** Политика глубины агрегации по нескольким источникам — не «список источников». */
 const AGG_DEPTH_MAX = 3;
@@ -46,6 +47,7 @@ export function ModsBrowser({
   onOpenSettings,
 }: Props) {
   const { registry, selection, labelOf, filenameFor } = useSources();
+  const { t, tp } = useI18n();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const activeSources = useMemo(() => {
@@ -147,7 +149,7 @@ export function ModsBrowser({
           );
           if (seq !== seqRef.current) return;
           if (merged.length === 0 && errors.length === srcs.length) {
-            throw new Error("все источники сейчас недоступны");
+            throw new Error(t("browser_all_sources_down"));
           }
           setItems(dedupById(merged));
           setPartialErrors(errors);
@@ -166,7 +168,7 @@ export function ModsBrowser({
         if (seq === seqRef.current) setLoading(false);
       }
     },
-    [labelOf],
+    [labelOf, t],
   );
 
   useEffect(() => {
@@ -219,7 +221,7 @@ export function ModsBrowser({
       <div className="browser-toolbar">
         <input
           className="search-input"
-          placeholder="Поиск по названию…"
+          placeholder={t("search_placeholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -232,7 +234,7 @@ export function ModsBrowser({
             aria-expanded={pickerOpen}
             onClick={() => setPickerOpen((o) => !o)}
           >
-            Источники: {activeSources.length}
+            {t("browser_sources_label", { n: activeSources.length })}
           </button>
           <SourcePicker
             open={pickerOpen}
@@ -257,29 +259,26 @@ export function ModsBrowser({
           )}
         {multi && (
           <span className="browser-count">
-            {activeSources.length} источника, страниц: {aggDepth} / {AGG_DEPTH_MAX}
+            {tp("count_sources", activeSources.length)}, {t("browser_pages", { depth: aggDepth, max: AGG_DEPTH_MAX })}
           </span>
         )}
         <select
           className="category-select"
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          title="Сортировка"
+          title={t("browser_sort_title")}
         >
           {BROWSER_SORTS.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.label}
+              {t(s.labelKey)}
             </option>
           ))}
         </select>
-        {!multi && <span className="browser-count">{visible.length} модов</span>}
+        {!multi && <span className="browser-count">{tp("count_mods", visible.length)}</span>}
       </div>
 
       {activeSources.length === 0 && (
-        <div className="banner banner-hint">
-          Не выбран ни один источник для поиска. Откройте «Источники» рядом с
-          полем поиска или «Настройки → Источники» и включите хотя бы один.
-        </div>
+        <div className="banner banner-hint">{t("browser_no_source_banner")}</div>
       )}
 
       {multi && (
@@ -291,12 +290,12 @@ export function ModsBrowser({
               onClick={() => toggleHidden(id)}
               title={
                 hiddenSources.has(id)
-                  ? "Показать этот источник"
-                  : "Скрыть этот источник из результатов"
+                  ? t("browser_chip_show")
+                  : t("browser_chip_hide")
               }
             >
               {labelOf(id)}
-              {hiddenSources.has(id) ? " (скрыт)" : ""}
+              {hiddenSources.has(id) ? t("browser_chip_hidden") : ""}
             </button>
           ))}
         </div>
@@ -306,7 +305,7 @@ export function ModsBrowser({
 
       {partialErrors.length > 0 && (
         <div className="banner banner-warn">
-          Некоторые источники вернули ошибки:
+          {t("browser_partial_errors")}
           <ul className="banner-list">
             {partialErrors.map((e, i) => (
               <li key={i}>{e}</li>
@@ -315,13 +314,13 @@ export function ModsBrowser({
         </div>
       )}
 
-      {loading && <div className="browser-loading">Загрузка…</div>}
+      {loading && <div className="browser-loading">{t("browser_loading")}</div>}
 
       {!loading &&
         activeSources.length > 0 &&
         visible.length === 0 &&
         !error &&
-        partialErrors.length === 0 && <div className="browser-empty">Моды не найдены</div>}
+        partialErrors.length === 0 && <div className="browser-empty">{t("browser_empty")}</div>}
 
       <div className="mod-grid" data-size={cardSize}>
         {visible.map((item) => (
@@ -348,10 +347,10 @@ export function ModsBrowser({
             disabled={aggDepth >= AGG_DEPTH_MAX}
             onClick={() => setAggDepth((d) => Math.min(AGG_DEPTH_MAX, d + 1))}
           >
-            Показать ещё
+            {t("browser_show_more")}
           </button>
           <span>
-            страниц в источнике: {aggDepth} / {AGG_DEPTH_MAX}
+            {t("browser_pages_in_source", { depth: aggDepth, max: AGG_DEPTH_MAX })}
           </span>
         </div>
       )}
@@ -363,7 +362,7 @@ export function ModsBrowser({
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            ← Назад
+            {t("browser_prev")}
           </button>
           <span>
             {page} / {totalPages}
@@ -373,7 +372,7 @@ export function ModsBrowser({
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Вперёд →
+            {t("browser_next")}
           </button>
         </div>
       )}

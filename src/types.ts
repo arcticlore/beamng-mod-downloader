@@ -1,3 +1,5 @@
+import type { MessageKey, Lang } from "./i18n";
+
 export interface ModItem {
   id: string;
   source: string;
@@ -91,31 +93,38 @@ export interface AppSettings {
   installedSort?: string | null;
   installedCollapsed?: boolean | null;
   cardSize?: string | null;
+  language?: string | null;
 }
 
-export const THEMES = [
-  { id: "dark", label: "Тёмная" },
-  { id: "light", label: "Светлая" },
+/** Опции интерфейса: label задаётся ключом словаря (RU/EN), значение — id для сохранения. */
+export interface UiOption {
+  id: string;
+  labelKey: MessageKey;
+}
+
+export const THEMES: UiOption[] = [
+  { id: "dark", labelKey: "theme_dark" },
+  { id: "light", labelKey: "theme_light" },
 ];
 
-export const CARD_SIZES = [
-  { id: "compact", label: "Компактные" },
-  { id: "normal", label: "Обычные" },
-  { id: "large", label: "Крупные" },
+export const CARD_SIZES: UiOption[] = [
+  { id: "compact", labelKey: "cardsize_compact" },
+  { id: "normal", labelKey: "cardsize_normal" },
+  { id: "large", labelKey: "cardsize_large" },
 ];
 
-export const INSTALLED_SORTS = [
-  { id: "date", label: "По дате изменения" },
-  { id: "name", label: "По имени" },
-  { id: "size", label: "По размеру" },
+export const INSTALLED_SORTS: UiOption[] = [
+  { id: "date", labelKey: "sort_installed_date" },
+  { id: "name", labelKey: "sort_installed_name" },
+  { id: "size", labelKey: "sort_installed_size" },
 ];
 
-export const BROWSER_SORTS = [
-  { id: "relevance", label: "Актуальность" },
-  { id: "updated", label: "По новизне" },
-  { id: "name", label: "По имени (А-Я)" },
-  { id: "popularity", label: "По популярности" },
-  { id: "size", label: "По размеру" },
+export const BROWSER_SORTS: UiOption[] = [
+  { id: "relevance", labelKey: "sort_browser_relevance" },
+  { id: "updated", labelKey: "sort_browser_updated" },
+  { id: "name", labelKey: "sort_browser_name" },
+  { id: "popularity", labelKey: "sort_browser_popularity" },
+  { id: "size", labelKey: "sort_browser_size" },
 ];
 
 export type SourceGroup = "official" | "forges" | "community" | "custom";
@@ -182,20 +191,56 @@ export function sanitizeFileName(raw: string): string {
   return cleaned;
 }
 
-export function formatBytes(n: number | null | undefined): string {
+export function formatBytes(
+  n: number | null | undefined,
+  lang: Lang = "ru",
+): string {
   if (n == null) return "";
-  if (n < 1024) return `${n} Б`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+  const unit = (value: number): string => {
+    if (value < 1024) return `${value} ${tUnit(lang, "bytes_byte")}`;
+    if (value < 1024 * 1024)
+      return `${(value / 1024).toFixed(1)} ${tUnit(lang, "bytes_kb")}`;
+    if (value < 1024 * 1024 * 1024)
+      return `${(value / (1024 * 1024)).toFixed(1)} ${tUnit(lang, "bytes_mb")}`;
+    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} ${tUnit(
+      lang,
+      "bytes_gb",
+    )}`;
+  };
+  return unit(n);
 }
 
-export function formatSpeed(bps: number | null | undefined): string {
+export function formatSpeed(
+  bps: number | null | undefined,
+  lang: Lang = "ru",
+): string {
   if (!bps) return "";
-  if (bps < 1024) return `${Math.round(bps)} Б/с`;
-  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(1)} КБ/с`;
-  return `${(bps / (1024 * 1024)).toFixed(1)} МБ/с`;
+  const suffix = tUnit(lang, "bytes_per_sec_suffix");
+  if (bps < 1024) return `${Math.round(bps)} ${tUnit(lang, "bytes_byte")}${suffix}`;
+  if (bps < 1024 * 1024)
+    return `${(bps / 1024).toFixed(1)} ${tUnit(lang, "bytes_kb")}${suffix}`;
+  return `${(bps / (1024 * 1024)).toFixed(1)} ${tUnit(lang, "bytes_mb")}${suffix}`;
 }
+
+function tUnit(lang: Lang, key: MessageKey): string {
+  return lang === "en" ? (enUnits[key] ?? "") : (ruUnits[key] ?? "");
+}
+
+const ruUnits: Record<string, string> = {
+  bytes_byte: "Б",
+  bytes_kb: "КБ",
+  bytes_mb: "МБ",
+  bytes_gb: "ГБ",
+  bytes_per_sec_suffix: "/с",
+};
+
+const enUnits: Record<string, string> = {
+  bytes_byte: "B",
+  bytes_kb: "KB",
+  bytes_mb: "MB",
+  bytes_gb: "GB",
+  bytes_per_sec_suffix: "/s",
+};
 
 const STOPWORDS = new Set(["mod", "mods", "beamng", "drive", "the", "and", "for", "with", "new"]);
 

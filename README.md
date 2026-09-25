@@ -23,9 +23,10 @@
 - карточки модов: имя, автор, аватарка, описание, счётчик скачиваний, размер;
 - кастомизация интерфейса: тёмная/светлая тема, акцентный цвет, размер карточек, сортировка и сворачивание панели установленных;
 - логирование: файл `beamng.log` в каталоге данных приложения (текущая скорость, ошибки сети, действия), консоль фронтенда продублирована туда же; в настройках есть кнопка «Открыть папку логов»;
+- **русский и английский интерфейс** — язык переключается в «Настройки → Внешний вид» (поле `language` в `config.json`; у нового конфига язык определяется по системной локали, у старого остаётся русский);
 - скачивание с прогрессом (текущая скорость, байты), установка прямо в папку модов (папку `mods` текущей версии);
 - вкладка «Установленные» со списком `.zip`, удаление;
-- конфиг хранится в `~/.config/beamng-mod-downloader/config.json` (`mods_folder`, `theme`, `accent`, `installed_sort`, `installed_collapsed`, `card_size`, `enabled_sources`, `selected_sources`).
+- конфиг хранится в `~/.config/beamng-mod-downloader/config.json` (`mods_folder`, `theme`, `accent`, `installed_sort`, `installed_collapsed`, `card_size`, `language`, `enabled_sources`, `selected_sources`).
 
 ## Структура
 
@@ -33,11 +34,13 @@
 src/                        React-интерфейс (TypeScript, Vite)
 src/api.ts                  тонкая обёртка над командами Tauri (с логированием invoke)
 src/theme.ts                применение темы и акцентного цвета
+src/i18n/                   словари интерфейса: ru.ts / en.ts, хелперы t()/tp(), LanguageContext
 src/sources.ts              чистая логика выбора источников (пресеты, имена файлов, дедупликация)
 src/SourcesContext.tsx      состояние registry и выбора источника для всего фронтенда
 src/components/             ModCard, ModsBrowser, DetailModal, InstalledPanel, SettingsModal (включая секцию «Источники»), ProgressBar
 src-tauri/src/lib.rs        команды Tauri и AppState (включая гейты enabled-источников)
 src-tauri/src/config.rs     чтение/запись конфига (+ миграция выбора источников)
+src-tauri/src/i18n.rs       локаль бэкенда: Lang, set_lang, t/tf/tfp (RU/EN)
 src-tauri/src/game.rs       поиск папок модов
 src-tauri/src/http.rs       HTTP-клиент и утилиты
 src-tauri/src/download.rs   менеджер загрузок с прогрессом
@@ -96,7 +99,9 @@ npm test
 
 Поля: `mods_folder` — путь к папке модов; `theme` — `"dark"`/
 `"light"`; `accent` — HEX-цвет; `installed_sort` — `"date"`/`"name"`/`"size"`;
-`installed_collapsed` — булево; `card_size` — `"compact"`/`"normal"`/`"large"`.
+`installed_collapsed` — булево; `card_size` — `"compact"`/`"normal"`/`"large"`;
+`language` — `"ru"`/`"en"` (отсутствие поля означает: новый конфиг — язык по системной
+локали; конфиг, созданный до появления поля, — русский).
 
 ### Выбор источников (`enabled_sources`, `selected_sources`)
 

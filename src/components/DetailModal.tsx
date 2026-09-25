@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getModDetail } from "../api";
 import { useSources } from "../SourcesContext";
 import { installModeLabel, trustLabel, urlHost } from "../sources";
+import { useI18n } from "../i18n/LanguageContext";
 import type { DownloadState, ModDetail, ModItem } from "../types";
 import { formatBytes } from "../types";
 
@@ -16,6 +17,7 @@ interface Props {
 
 export function DetailModal({ item, dl, installed, similar, onInstall, onClose }: Props) {
   const { labelOf, descriptorOf, filenameFor } = useSources();
+  const { t, lang } = useI18n();
   const [detail, setDetail] = useState<ModDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
@@ -77,36 +79,40 @@ export function DetailModal({ item, dl, installed, similar, onInstall, onClose }
                 {descriptor && (
                   <span
                     className={`trust-badge trust-${descriptor.trustLevel}`}
-                    title={`Доверие: ${trustLabel(descriptor.trustLevel)}`}
+                    title={t("trust_badge_title", { level: t(trustLabel(descriptor.trustLevel)) })}
                   >
-                    {trustLabel(descriptor.trustLevel)}
+                    {t(trustLabel(descriptor.trustLevel))}
                   </span>
                 )}
                 {descriptor && descriptor.installMode !== "mods_zip" && (
-                  <span className="install-mode-badge" title={modeLabel ?? undefined}>
-                    {modeLabel}
+                  <span
+                    className="install-mode-badge"
+                    title={modeLabel ? t(modeLabel) : undefined}
+                  >
+                    {modeLabel ? t(modeLabel) : null}
                   </span>
                 )}
               </div>
               <h2>{item.name}</h2>
               {!installed && similar && (
                 <div className="mod-warning">
-                  Похожий мод уже установлен как «{similar.filename}». Если это не обновление —
-                  установка создаст второй экземпляр мода.
+                  {t("detail_similar_warning", { file: similar.filename })}
                 </div>
               )}
-              {item.author && <div className="mod-meta">автор: {item.author}</div>}
-            {item.downloads && <div className="mod-meta">скачиваний: {item.downloads}</div>}
-            {item.sizeBytes ? <div className="mod-meta">размер: {formatBytes(item.sizeBytes)}</div> : null}
-            {item.published && <div className="mod-meta">дата: {item.published}</div>}
-            {host && <div className="mod-meta">домен: {host}</div>}
+              {item.author && <div className="mod-meta">{t("detail_author", { author: item.author })}</div>}
+            {item.downloads && <div className="mod-meta">{t("detail_downloads", { downloads: item.downloads })}</div>}
+            {item.sizeBytes ? (
+              <div className="mod-meta">{t("detail_size", { size: formatBytes(item.sizeBytes, lang) })}</div>
+            ) : null}
+            {item.published && <div className="mod-meta">{t("detail_date", { date: item.published })}</div>}
+            {host && <div className="mod-meta">{t("detail_domain", { host })}</div>}
             <div className="mod-full-desc">
               {detail ? (
-                detail.fullDescription || detail.item.description || "Описание отсутствует."
+                detail.fullDescription || detail.item.description || t("detail_no_desc")
               ) : error ? (
-                <span className="error-text">Не удалось загрузить описание: {error}</span>
+                <span className="error-text">{t("detail_load_error", { err: error })}</span>
               ) : (
-                "Загрузка описания…"
+                t("detail_loading_desc")
               )}
             </div>
             {dl?.state === "error" && <div className="error-text">{dl.error}</div>}
@@ -115,15 +121,15 @@ export function DetailModal({ item, dl, installed, similar, onInstall, onClose }
                 className="btn btn-primary btn-lg"
                 disabled={installed || downloading || !autoInstall}
                 onClick={() => onInstall(item)}
-                title={modeLabel ?? undefined}
+                title={modeLabel ? t(modeLabel) : undefined}
               >
                 {!autoInstall
-                  ? "Установка вручную"
+                  ? t("detail_manual_install")
                   : installed
-                    ? "✓ Установлено"
+                    ? t("detail_installed")
                     : downloading
-                      ? "Загрузка…"
-                      : "Скачать и установить"}
+                      ? t("detail_downloading")
+                      : t("detail_install")}
               </button>
               <span className="hint-file">{filenameFor(item)}</span>
             </div>
