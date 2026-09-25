@@ -3,26 +3,13 @@ import type { DownloadState } from "../types";
 import { formatBytes, formatSpeed } from "../types";
 import type { MessageKey } from "../i18n";
 import { useI18n } from "../i18n/LanguageContext";
+import { formatEta } from "../format";
 import { ProgressBar } from "./ProgressBar";
 
 interface Props {
   downloads: Record<string, DownloadState>;
   onClearFinished: () => void;
   onCancel: (key: string) => void;
-}
-
-function formatEta(
-  remaining: number,
-  speedBps: number,
-  units: { h: string; m: string; s: string },
-): string | null {
-  if (speedBps <= 0 || remaining <= 0) return null;
-  const secs = Math.ceil(remaining / speedBps);
-  if (secs >= 3600)
-    return `${Math.floor(secs / 3600)} ${units.h} ${Math.floor((secs % 3600) / 60)} ${units.m}`;
-  if (secs >= 60)
-    return `${Math.floor(secs / 60)} ${units.m} ${secs % 60} ${units.s}`;
-  return `${secs} ${units.s}`;
 }
 
 const ETA_KEYS: { h: MessageKey; m: MessageKey; s: MessageKey } = {

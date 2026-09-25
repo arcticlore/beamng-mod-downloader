@@ -4,6 +4,7 @@ import { attachConsole } from "@tauri-apps/plugin-log";
 import App from "./App";
 import "./styles.css";
 import "./material.css";
+import "./material-app.css";
 
 attachConsole();
 

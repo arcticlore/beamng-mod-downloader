@@ -17,6 +17,7 @@ import { DownloadsPanel } from "./components/DownloadsPanel";
 import { InstalledPanel } from "./components/InstalledPanel";
 import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
+import { MaterialApp } from "./components/material/MaterialApp";
 import {
   findSimilarInstalled,
   type AppSettings,
@@ -177,6 +178,57 @@ function AppInner() {
     },
     [showToast, installedList, installedNames, filenameFor, t],
   );
+
+  const materialStyle = (settings?.style ?? "material") === "material";
+
+  const detailFlags =
+    detailItem !== null
+      ? {
+          installed: installedNames.has(filenameFor(detailItem)),
+          similar: installedNames.has(filenameFor(detailItem))
+            ? null
+            : findSimilarInstalled(detailItem, installedList),
+        }
+      : { installed: false, similar: null };
+
+  if (materialStyle) {
+    return (
+      <LanguageProvider lang={lang}>
+        <MaterialApp
+          modsFolder={modsFolder}
+          settings={settings}
+          view={view}
+          setView={setView}
+          settingsOpen={settingsOpen}
+          setSettingsOpen={setSettingsOpen}
+          onSettingsChanged={() => {
+            getModsFolder().then(setModsFolder).catch(() => {});
+            getSettings().then(setSettingsState).catch(() => {});
+            refreshInstalled();
+          }}
+          detailItem={detailItem}
+          detailInstalled={detailFlags.installed}
+          detailSimilar={detailFlags.similar}
+          setDetailItem={setDetailItem}
+          downloads={downloads}
+          onCancel={onCancel}
+          onClearFinished={() =>
+            setDownloads((prev) => {
+              const next: Record<string, DownloadState> = {};
+              for (const d of Object.values(prev)) {
+                if (d.state === "downloading") next[d.key] = d;
+              }
+              return next;
+            })
+          }
+          onInstall={onInstall}
+          installedNames={installedNames}
+          installedList={installedList}
+          toast={toast}
+        />
+      </LanguageProvider>
+    );
+  }
 
   return (
     <LanguageProvider lang={lang}>

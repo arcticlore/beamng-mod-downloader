@@ -1,31 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCategories, searchMods } from "../api";
+import { useMemo } from "react";
 import { useSources } from "../SourcesContext";
-import { dedupById, resolveActiveSources } from "../sources";
-import {
-  BROWSER_SORTS,
-  findSimilarInstalled,
-  type DownloadState,
-  type ModItem,
-  type SourceCategory,
-} from "../types";
+import { findSimilarInstalled } from "../types";
+import type { DownloadState, ModItem } from "../types";
+import { useModsBrowser } from "../hooks/useModsBrowser";
+import { useI18n } from "../i18n/LanguageContext";
+import { BROWSER_SORTS } from "../types";
 import { ModCard } from "./ModCard";
 import { SourcePicker } from "./SourcePicker";
-import { useI18n } from "../i18n/LanguageContext";
-
-/** Политика глубины агрегации по нескольким источникам — не «список источников». */
-const AGG_DEPTH_MAX = 3;
-
-function dateOf(published: string | null): number {
-  if (!published) return 0;
-  const ms = Date.parse(published);
-  return Number.isFinite(ms) ? ms : 0;
-}
-
-function popOf(m: ModItem): number {
-  const n = Number((m.downloads ?? "").replace(/[^\d]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
 
 interface Props {
   downloads: Record<string, DownloadState>;
@@ -46,175 +27,43 @@ export function ModsBrowser({
   onInfo,
   onOpenSettings,
 }: Props) {
-  const { registry, selection, labelOf, filenameFor } = useSources();
+  const { filenameFor, labelOf } = useSources();
   const { t, tp } = useI18n();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const {
+    pickerOpen,
+    setPickerOpen,
+    activeSources,
+    single,
+    multi,
+    categoriesDescriptor,
+    page,
+    setPage,
+    totalPages,
+    category,
+    setCategory,
+    sort,
+    setSort,
+    categories,
+    query,
+    setQuery,
+    loading,
+    error,
+    partialErrors,
+    aggDepth,
+    setAggDepth,
+    aggMore,
+    hiddenSources,
+    toggleHidden,
+    visible,
+  } = useModsBrowser();
 
-  const activeSources = useMemo(() => {
-    if (!selection) return [];
-    return resolveActiveSources(registry, selection.enabled, selection.selected);
-  }, [registry, selection]);
-
-  const activeKey = activeSources.join(",");
-  const categoriesDescriptor = useMemo(() => {
-    return activeSources.length === 1
-      ? registry.find((d) => d.id === activeSources[0])
-      : undefined;
-  }, [registry, activeSources]);
-
-  const [items, setItems] = useState<ModItem[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [page, setPage] = useState(1);
-  const [category, setCategory] = useState<string>("all");
-  const [sort, setSort] = useState<string>("relevance");
-  const [categories, setCategories] = useState<SourceCategory[]>([]);
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [partialErrors, setPartialErrors] = useState<string[]>([]);
-  const [aggDepth, setAggDepth] = useState(1);
-  const [aggMore, setAggMore] = useState(false);
-  const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set());
-
-  const seqRef = useRef(0);
-
-  const single = activeSources.length === 1;
-  const multi = activeSources.length > 1;
-
-  useEffect(() => {
-    if (!categoriesDescriptor) {
-      setCategories([]);
-      return;
-    }
-    if (categoriesDescriptor.capabilities.categories) {
-      getCategories(categoriesDescriptor.id)
-        .then(setCategories)
-        .catch(() => setCategories([]));
-    } else {
-      setCategories([]);
-    }
-  }, [categoriesDescriptor]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  const load = useCallback(
-    async (
-      srcs: string[],
-      cat: string,
-      pg: number,
-      q: string,
-      ord: string,
-      depth: number,
-    ) => {
-      const seq = ++seqRef.current;
-      setLoading(true);
-      setError(null);
-      setPartialErrors([]);
-      try {
-        if (srcs.length === 1) {
-          const res = await searchMods(
-            srcs[0],
-            q || null,
-            cat === "all" ? null : cat,
-            pg,
-            ord,
-          );
-          if (seq !== seqRef.current) return;
-          setItems(res.items);
-          setTotalPages(res.totalPages || 1);
-        } else if (srcs.length > 1) {
-          const merged: ModItem[] = [];
-          const errors: string[] = [];
-          const pages = Math.max(1, Math.min(depth, AGG_DEPTH_MAX));
-          let maxTotal = 1;
-          await Promise.all(
-            srcs.map(async (s) => {
-              let srcOk = false;
-              try {
-                for (let i = 1; i <= pages; i++) {
-                  const r = await searchMods(s, q || null, null, i, ord);
-                  srcOk = true;
-                  if (r.totalPages > maxTotal) maxTotal = r.totalPages;
-                  if (r.items) merged.push(...r.items);
-                }
-              } catch (e) {
-                console.warn(`источник ${s} ${srcOk ? "частично" : ""} недоступен:`, e);
-                errors.push(`${labelOf(s)}: ${String(e)}`);
-              }
-            }),
-          );
-          if (seq !== seqRef.current) return;
-          if (merged.length === 0 && errors.length === srcs.length) {
-            throw new Error(t("browser_all_sources_down"));
-          }
-          setItems(dedupById(merged));
-          setPartialErrors(errors);
-          setAggMore(maxTotal > pages);
-          setTotalPages(1);
-        } else {
-          setItems([]);
-          setTotalPages(1);
-        }
-      } catch (e) {
-        if (seq === seqRef.current) {
-          setError(String(e));
-          setItems([]);
-        }
-      } finally {
-        if (seq === seqRef.current) setLoading(false);
-      }
-    },
-    [labelOf, t],
-  );
-
-  useEffect(() => {
-    setPage(1);
-    setAggDepth(1);
-    setHiddenSources(new Set());
-    setAggMore(false);
-    setCategory("all");
-  }, [activeKey]);
-
-  useEffect(() => {
-    setPage(1);
-    setAggDepth(1);
-    setAggMore(false);
-  }, [category, debouncedQuery, sort]);
-
-  useEffect(() => {
-    load(activeSources, category, page, debouncedQuery, sort, aggDepth);
-  }, [activeSources, activeKey, category, page, debouncedQuery, sort, aggDepth, load]);
-
-  const visible = useMemo(() => {
-    let list = items.filter((m) => !hiddenSources.has(m.source));
-    if (debouncedQuery) {
-      const q = debouncedQuery.toLowerCase();
-      list = list.filter((m) => m.name.toLowerCase().includes(q));
-    }
-    if (sort === "name") {
-      list = [...list].sort((a, b) => a.name.localeCompare(b.name, "ru"));
-    } else if (sort === "updated") {
-      list = [...list].sort((a, b) => dateOf(b.published) - dateOf(a.published));
-    } else if (sort === "popularity") {
-      list = [...list].sort((a, b) => popOf(b) - popOf(a));
-    } else if (sort === "size") {
-      list = [...list].sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0));
-    }
-    return list;
-  }, [items, hiddenSources, debouncedQuery, sort]);
-
-  const toggleHidden = useCallback((id: string) => {
-    setHiddenSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const categorySelect = useMemo(() => {
+    return (
+      single &&
+      categories.length > 1 &&
+      categoriesDescriptor?.capabilities.categories
+    );
+  }, [single, categories.length, categoriesDescriptor]);
 
   return (
     <div className="browser">
@@ -242,24 +91,22 @@ export function ModsBrowser({
             onOpenSettings={onOpenSettings}
           />
         </div>
-        {single &&
-          categories.length > 1 &&
-          categoriesDescriptor?.capabilities.categories && (
-            <select
-              className="category-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          )}
+        {categorySelect && (
+          <select
+            className="category-select"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        )}
         {multi && (
           <span className="browser-count">
-            {tp("count_sources", activeSources.length)}, {t("browser_pages", { depth: aggDepth, max: AGG_DEPTH_MAX })}
+            {tp("count_sources", activeSources.length)}, {t("browser_pages", { depth: aggDepth, max: 3 })}
           </span>
         )}
         <select
@@ -274,7 +121,9 @@ export function ModsBrowser({
             </option>
           ))}
         </select>
-        {!multi && <span className="browser-count">{tp("count_mods", visible.length)}</span>}
+        {!multi && (
+          <span className="browser-count">{tp("count_mods", visible.length)}</span>
+        )}
       </div>
 
       {activeSources.length === 0 && (
@@ -320,7 +169,9 @@ export function ModsBrowser({
         activeSources.length > 0 &&
         visible.length === 0 &&
         !error &&
-        partialErrors.length === 0 && <div className="browser-empty">{t("browser_empty")}</div>}
+        partialErrors.length === 0 && (
+          <div className="browser-empty">{t("browser_empty")}</div>
+        )}
 
       <div className="mod-grid" data-size={cardSize}>
         {visible.map((item) => (
@@ -344,13 +195,13 @@ export function ModsBrowser({
         <div className="pagination">
           <button
             className="btn"
-            disabled={aggDepth >= AGG_DEPTH_MAX}
-            onClick={() => setAggDepth((d) => Math.min(AGG_DEPTH_MAX, d + 1))}
+            disabled={aggDepth >= 3}
+            onClick={() => setAggDepth((d) => Math.min(3, d + 1))}
           >
             {t("browser_show_more")}
           </button>
           <span>
-            {t("browser_pages_in_source", { depth: aggDepth, max: AGG_DEPTH_MAX })}
+            {t("browser_pages_in_source", { depth: aggDepth, max: 3 })}
           </span>
         </div>
       )}

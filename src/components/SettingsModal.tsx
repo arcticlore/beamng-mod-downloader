@@ -1,30 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  detectModsFolders,
-  getModsFolder,
-  getSettings,
-  openLogDir,
-  setModsFolder,
-  setModsFolderForce,
-  setSettings,
-} from "../api";
-import { applyAppearance, ACCENT_PRESETS } from "../theme";
-import { useSources } from "../SourcesContext";
-import {
-  applyPreset,
-  canonicalizeSelection,
-  groupLabel,
-  searchCapableEnabledIds,
-  sortByGroup,
-  statusLabel,
-  toggleSourceSelection,
-  trustLabel,
-} from "../sources";
+import { ACCENT_PRESETS } from "../theme";
+import { groupLabel, statusLabel, trustLabel } from "../sources";
 import { useI18n } from "../i18n/LanguageContext";
-import type { AppSettings, ModsFolderCandidate, SourceGroup } from "../types";
 import { CARD_SIZES, INSTALLED_SORTS, STYLES, THEMES } from "../types";
-
-const GROUPS: SourceGroup[] = ["official", "forges", "community", "custom"];
+import { GROUPS, useSettings } from "../hooks/useSettings";
 
 const LANGUAGES: { id: "ru" | "en"; labelKey: "language_ru" | "language_en" }[] = [
   { id: "ru", labelKey: "language_ru" },
@@ -38,151 +16,9 @@ interface Props {
 
 export function SettingsModal({ onClose, onChanged }: Props) {
   const { t } = useI18n();
-  const [current, setCurrent] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<ModsFolderCandidate[]>([]);
-  const [manual, setManual] = useState("");
-  const [settings, setSettingsState] = useState<AppSettings>({});
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const folder = await getModsFolder();
-      if (cancelled) return;
-      setCurrent(folder);
-      setManual(folder ?? "");
-      try {
-        const cands = await detectModsFolders();
-        if (!cancelled) setCandidates(cands);
-      } catch {
-        if (!cancelled) setCandidates([]);
-      }
-      const s = await getSettings();
-      if (!cancelled) setSettingsState(s);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const showMsg = (ok: boolean, text: string) => setMsg({ ok, text });
-
-  const saveSettings = async (next: AppSettings, quiet = false) => {
-    setSettingsState(next);
-    applyAppearance(next);
-    try {
-      await setSettings(next);
-      onChanged();
-      if (!quiet) showMsg(true, t("saved_settings"));
-    } catch (e) {
-      showMsg(false, String(e));
-    }
-  };
-
-  const applyFolder = async (path: string, force: boolean) => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      if (force) {
-        await setModsFolderForce(path);
-      } else {
-        await setModsFolder(path);
-      }
-      setCurrent(path);
-      setManual(path);
-      showMsg(true, t("saved_folder"));
-      onChanged();
-    } catch (e) {
-      showMsg(false, String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const openLogs = async () => {
-    setMsg(null);
-    try {
-      await openLogDir();
-    } catch (e) {
-      showMsg(false, String(e));
-    }
-  };
-
-  const {
-    registry,
-    selection,
-    loading: sourcesLoading,
-    error: sourcesError,
-    setEnabled,
-    setSelected,
-    resetDefaults,
-  } = useSources();
-  const [sourcesBusy, setSourcesBusy] = useState(false);
-
-  const enabledSet = useMemo(
-    () => new Set(selection?.enabled ?? []),
-    [selection],
-  );
-  const selectedIsAll = selection?.selected === null;
-  const searchCapable = useMemo(
-    () => searchCapableEnabledIds(registry, selection?.enabled ?? []),
-    [registry, selection],
-  );
-  const selectedSet = useMemo(() => {
-    if (!selection) return new Set<string>();
-    if (selection.selected === null) return new Set(searchCapable);
-    return new Set(selection.selected);
-  }, [selection, searchCapable]);
-  const anyEnabled = enabledSet.size > 0;
-
-  const runSource = async (fn: () => Promise<void>, okText: string) => {
-    setSourcesBusy(true);
-    try {
-      await fn();
-      showMsg(true, okText);
-    } catch (e) {
-      showMsg(false, String(e));
-    } finally {
-      setSourcesBusy(false);
-    }
-  };
-
-  const toggleEnabled = (id: string) =>
-    runSource(() => setEnabled(id, !enabledSet.has(id)), t("msg_sources_saved"));
-
-  const toggleSelected = (id: string) =>
-    runSource(
-      () =>
-        setSelected(
-          toggleSourceSelection(
-            registry,
-            selection?.enabled ?? [],
-            selection?.selected ?? null,
-            id,
-          ),
-        ),
-      t("msg_search_updated"),
-    );
-
-  const applyPresetNow = (
-    preset: "recommended" | "official_forges" | "all_configured" | "clear",
-  ) => {
-    const list = applyPreset(preset, registry, [...enabledSet]);
-    const next = canonicalizeSelection(searchCapable, list);
-    return runSource(() => setSelected(next), t("msg_preset_applied"));
-  };
-
-  const groups = useMemo(() => {
-    const ordered = sortByGroup(registry);
-    const m = new Map<string, typeof ordered>();
-    for (const d of ordered) {
-      const arr = m.get(d.group) ?? [];
-      arr.push(d);
-      m.set(d.group, arr);
-    }
-    return m;
-  }, [registry]);
+  const controller = useSettings(onChanged);
+  const { folder, appearance, logs, sources, msg } = controller;
+  const { settings, saveSettings } = appearance;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -192,21 +28,21 @@ export function SettingsModal({ onClose, onChanged }: Props) {
 
         <section>
           <h3>{t("folder_section_title")}</h3>
-          {current && (
+          {folder.current && (
             <div className="current-path">
-              {t("folder_current")} <code>{current}</code>
+              {t("folder_current")} <code>{folder.current}</code>
             </div>
           )}
           <p className="hint">{t("folder_hint")}</p>
-          {candidates.length > 0 ? (
+          {folder.candidates.length > 0 ? (
             <div className="candidate-list">
-              {candidates.map((c) => (
+              {folder.candidates.map((c) => (
                 <button
                   key={c.path}
-                  className={`candidate ${current === c.path ? "candidate-active" : ""}`}
+                  className={`candidate ${folder.current === c.path ? "candidate-active" : ""}`}
                   onClick={() => {
-                    setManual(c.path);
-                    applyFolder(c.path, false);
+                    folder.setManual(c.path);
+                    folder.applyFolder(c.path, false);
                   }}
                 >
                   {c.path}
@@ -220,21 +56,21 @@ export function SettingsModal({ onClose, onChanged }: Props) {
             <input
               className="search-input"
               placeholder="/путь/к/.../mods"
-              value={manual}
-              onChange={(e) => setManual(e.target.value)}
+              value={folder.manual}
+              onChange={(e) => folder.setManual(e.target.value)}
             />
             <button
               className="btn btn-primary"
-              disabled={busy || !manual.trim()}
-              onClick={() => applyFolder(manual.trim(), false)}
+              disabled={folder.busy || !folder.manual.trim()}
+              onClick={() => folder.applyFolder(folder.manual.trim(), false)}
             >
               {t("folder_apply")}
             </button>
             <button
               className="btn"
-              disabled={busy || !manual.trim()}
+              disabled={folder.busy || !folder.manual.trim()}
               title={t("folder_force_title")}
-              onClick={() => applyFolder(manual.trim(), true)}
+              onClick={() => folder.applyFolder(folder.manual.trim(), true)}
             >
               {t("folder_force")}
             </button>
@@ -245,50 +81,48 @@ export function SettingsModal({ onClose, onChanged }: Props) {
           <h3>{t("sources_section_title")}</h3>
           <p className="hint" dangerouslySetInnerHTML={{ __html: t("sources_hint") }} />
 
-          {sourcesLoading && <div className="hint">{t("sources_loading")}</div>}
-          {!sourcesLoading && sourcesError && (
-            <div className="banner banner-error">{sourcesError}</div>
+          {sources.sourcesLoading && <div className="hint">{t("sources_loading")}</div>}
+          {!sources.sourcesLoading && sources.sourcesError && (
+            <div className="banner banner-error">{sources.sourcesError}</div>
           )}
 
-          {!sourcesLoading && !sourcesError && (
+          {!sources.sourcesLoading && !sources.sourcesError && (
             <>
               <div className="source-presets">
                 <button
                   className="btn btn-sm"
-                  disabled={!anyEnabled || sourcesBusy}
+                  disabled={!sources.anyEnabled || sources.sourcesBusy}
                   title={t("preset_recommended_title")}
-                  onClick={() => applyPresetNow("recommended")}
+                  onClick={() => sources.applyPresetNow("recommended")}
                 >
                   {t("preset_recommended")}
                 </button>
                 <button
                   className="btn btn-sm"
-                  disabled={!anyEnabled || sourcesBusy}
-                  onClick={() => applyPresetNow("official_forges")}
+                  disabled={!sources.anyEnabled || sources.sourcesBusy}
+                  onClick={() => sources.applyPresetNow("official_forges")}
                 >
                   {t("preset_official_forges")}
                 </button>
                 <button
                   className="btn btn-sm"
-                  disabled={!anyEnabled || sourcesBusy}
-                  onClick={() => applyPresetNow("all_configured")}
+                  disabled={!sources.anyEnabled || sources.sourcesBusy}
+                  onClick={() => sources.applyPresetNow("all_configured")}
                 >
                   {t("preset_all_configured")}
                 </button>
                 <button
                   className="btn btn-sm"
-                  disabled={!anyEnabled || sourcesBusy}
-                  onClick={() => applyPresetNow("clear")}
+                  disabled={!sources.anyEnabled || sources.sourcesBusy}
+                  onClick={() => sources.applyPresetNow("clear")}
                 >
                   {t("preset_clear")}
                 </button>
                 <button
                   className="btn btn-sm"
-                  disabled={sourcesBusy}
+                  disabled={sources.sourcesBusy}
                   title={t("preset_reset_defaults_title")}
-                  onClick={() =>
-                    runSource(resetDefaults, t("msg_sources_reset"))
-                  }
+                  onClick={sources.resetDefaultsNow}
                 >
                   {t("preset_reset_defaults")}
                 </button>
@@ -296,12 +130,12 @@ export function SettingsModal({ onClose, onChanged }: Props) {
 
               {GROUPS.map(
                 (g) =>
-                  groups.has(g) && (
+                  sources.groups.has(g) && (
                     <div key={g} className="source-group">
                       <div className="source-group-label">{t(groupLabel(g))}</div>
-                      {groups.get(g)!.map((d) => {
-                        const isEnabled = enabledSet.has(d.id);
-                        const isSelected = selectedSet.has(d.id);
+                      {sources.groups.get(g)!.map((d) => {
+                        const isEnabled = sources.enabledSet.has(d.id);
+                        const isSelected = sources.selectedSet.has(d.id);
                         const trustKey = trustLabel(d.trustLevel);
                         return (
                           <div
@@ -335,8 +169,8 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                                   type="checkbox"
                                   checked={isEnabled}
                                   className="switch-input"
-                                  disabled={sourcesBusy}
-                                  onChange={() => toggleEnabled(d.id)}
+                                  disabled={sources.sourcesBusy}
+                                  onChange={() => sources.toggleEnabled(d.id)}
                                 />
                                 <span className="switch-box" />
                                 <span>{t("source_enabled")}</span>
@@ -356,9 +190,9 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                                   checked={isEnabled && d.capabilities.search && isSelected}
                                   className="switch-input"
                                   disabled={
-                                    !isEnabled || !d.capabilities.search || sourcesBusy
+                                    !isEnabled || !d.capabilities.search || sources.sourcesBusy
                                   }
-                                  onChange={() => toggleSelected(d.id)}
+                                  onChange={() => sources.toggleSelected(d.id)}
                                 />
                                 <span className="switch-box" />
                                 <span>
@@ -377,7 +211,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                     </div>
                   ),
               )}
-              {selectedIsAll && (
+              {sources.selectedIsAll && (
                 <div className="hint">{t("sources_search_all_hint")}</div>
               )}
             </>
@@ -474,7 +308,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
             {t("logs_hint")}
             <code> beamng.log</code>
           </p>
-          <button className="btn" onClick={openLogs}>
+          <button className="btn" onClick={logs.openLogs}>
             {t("logs_open_folder")}
           </button>
         </section>
