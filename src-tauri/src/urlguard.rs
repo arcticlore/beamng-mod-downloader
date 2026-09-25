@@ -61,35 +61,65 @@ pub const MAX_REDIRECTS: usize = 8;
 
 /// Возвращает ошибку, если URL нарушает транспортную политику allowlist-источников.
 pub fn validate_url(url: &str) -> Result<(), String> {
-    let parsed = Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
+    let parsed = Url::parse(url).map_err(|e| {
+        crate::i18n::tf(
+            "невалидный URL `{0}`: {1}",
+            "invalid URL `{0}`: {1}",
+            &[url, &e.to_string()],
+        )
+    })?;
     match parsed.scheme() {
         "http" | "https" => {}
-        other => return Err(format!("схема `{other}://` запрещена (только http/https)")),
+        other => {
+            return Err(crate::i18n::tf(
+                "схема `{0}://` запрещена (только http/https)",
+                "scheme `{0}://` is forbidden (http/https only)",
+                &[other],
+            ))
+        }
     }
 
     if parsed.username() != "" || parsed.password().is_some() {
-        return Err("userinfo в URL запрещён".to_string());
+        return Err(
+            crate::i18n::t("userinfo в URL запрещён", "userinfo in a URL is forbidden").to_string(),
+        );
     }
 
     let host = parsed
         .host_str()
-        .ok_or_else(|| format!("URL без host: `{url}`"))?;
+        .ok_or_else(|| crate::i18n::tf("URL без host: `{0}`", "URL has no host: `{0}`", &[url]))?;
 
     if host.parse::<std::net::IpAddr>().is_ok() {
-        return Err(format!("host `{host}` — IP-литерал, запрещено"));
+        return Err(crate::i18n::tf(
+            "host `{0}` — IP-литерал, запрещено",
+            "host `{0}` is an IP literal, forbidden",
+            &[host],
+        ));
     }
 
     if host.parse::<u32>().is_ok() {
-        return Err(format!("host `{host}` похож на IP-индекс, запрещено"));
+        return Err(crate::i18n::tf(
+            "host `{0}` похож на IP-индекс, запрещено",
+            "host `{0}` looks like an IP index, forbidden",
+            &[host],
+        ));
     }
 
     if !host.contains('.') {
-        return Err(format!("host `{host}` — не доменное имя"));
+        return Err(crate::i18n::tf(
+            "host `{0}` — не доменное имя",
+            "host `{0}` is not a domain name",
+            &[host],
+        ));
     }
 
     if let Some(port) = parsed.port() {
         if port != 80 && port != 443 {
-            return Err(format!("порт {port} запрещён (только 80/443)"));
+            return Err(crate::i18n::tf(
+                "порт {0} запрещён (только 80/443)",
+                "port {0} is forbidden (80/443 only)",
+                &[&port.to_string()],
+            ));
         }
     }
 
@@ -100,10 +130,14 @@ pub fn validate_url(url: &str) -> Result<(), String> {
         .iter()
         .any(|exact| host.eq_ignore_ascii_case(exact));
     if !suffix_ok && !exact_ok {
-        return Err(format!(
-            "host `{host}` не входит в разрешённые домены ({}; exact: {})",
-            ALLOWED_HOST_SUFFIXES.join(", "),
-            ALLOWED_EXACT_HOSTS.join(", ")
+        return Err(crate::i18n::tf(
+            "host `{0}` не входит в разрешённые домены ({1}; exact: {2})",
+            "host `{0}` is not in the allowed domains ({1}; exact: {2})",
+            &[
+                host,
+                &ALLOWED_HOST_SUFFIXES.join(", "),
+                &ALLOWED_EXACT_HOSTS.join(", "),
+            ],
         ));
     }
     Ok(())
@@ -116,17 +150,24 @@ pub fn validate_url(url: &str) -> Result<(), String> {
 /// релиза не прошёл (даже если его хост разрешён историческим суффиксом).
 pub fn validate_source_url(url: &str, allowed_exact_hosts: &[&str]) -> Result<(), String> {
     validate_url(url)?;
-    let parsed = Url::parse(url).map_err(|e| format!("невалидный URL `{url}`: {e}"))?;
+    let parsed = Url::parse(url).map_err(|e| {
+        crate::i18n::tf(
+            "невалидный URL `{0}`: {1}",
+            "invalid URL `{0}`: {1}",
+            &[url, &e.to_string()],
+        )
+    })?;
     let host = parsed
         .host_str()
-        .ok_or_else(|| format!("URL без host: `{url}`"))?;
+        .ok_or_else(|| crate::i18n::tf("URL без host: `{0}`", "URL has no host: `{0}`", &[url]))?;
     if !allowed_exact_hosts
         .iter()
         .any(|exact| host.eq_ignore_ascii_case(exact))
     {
-        return Err(format!(
-            "host `{host}` не входит в exact-host allowlist источника ({})",
-            allowed_exact_hosts.join(", ")
+        return Err(crate::i18n::tf(
+            "host `{0}` не входит в exact-host allowlist источника ({1})",
+            "host `{0}` is not in the source exact-host allowlist ({1})",
+            &[host, &allowed_exact_hosts.join(", ")],
         ));
     }
     Ok(())

@@ -6,19 +6,40 @@ pub mod gitlab;
 pub mod registry;
 pub mod worldofmods;
 
+use crate::i18n;
 use crate::models::{ModDetail, ModSearchResult, SourceCategory};
 use anyhow::Result;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum SourceError {
-    #[error("Сетевая ошибка: {0}")]
     Network(String),
-    #[error("Ошибка разбора ответа: {0}")]
     Parse(String),
-    #[error("Источник недоступен: {0}")]
     Unavailable(String),
 }
+
+impl SourceError {
+    fn kind(self: &SourceError) -> (&'static str, &'static str) {
+        match self {
+            SourceError::Network(_) => ("Сетевая ошибка: ", "Network error: "),
+            SourceError::Parse(_) => ("Ошибка разбора ответа: ", "Failed to parse response: "),
+            SourceError::Unavailable(_) => ("Источник недоступен: ", "Source unavailable: "),
+        }
+    }
+}
+
+impl std::fmt::Display for SourceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (ru, en) = self.kind();
+        let (_, msg) = match self {
+            SourceError::Network(m) | SourceError::Parse(m) | SourceError::Unavailable(m) => {
+                ((), m.as_str())
+            }
+        };
+        write!(f, "{}{}", i18n::t(ru, en), msg)
+    }
+}
+
+impl std::error::Error for SourceError {}
 
 impl From<anyhow::Error> for SourceError {
     fn from(e: anyhow::Error) -> Self {
@@ -41,8 +62,10 @@ fn ensure_known(source: &str) -> Result<(), SourceError> {
     if validate_source(source) {
         Ok(())
     } else {
-        Err(SourceError::Unavailable(format!(
-            "неизвестный источник `{source}`"
+        Err(SourceError::Unavailable(i18n::tf(
+            "неизвестный источник `{0}`",
+            "unknown source `{0}`",
+            &[source],
         )))
     }
 }
@@ -63,8 +86,10 @@ pub async fn search(
         "gitlab" => gitlab::search(client, query, category, page, order).await,
         "codeberg" => codeberg::search(client, query, category, page, order).await,
         "beamngforum" => beamngforum::search(client, query, category, page, order).await,
-        other => Err(SourceError::Unavailable(format!(
-            "источник `{other}` пока не реализован"
+        other => Err(SourceError::Unavailable(i18n::tf(
+            "источник `{0}` пока не реализован",
+            "source `{0}` is not implemented yet",
+            &[other],
         ))),
     }
 }
@@ -83,8 +108,10 @@ pub async fn detail(
         "gitlab" => gitlab::detail(client, mod_id, key).await,
         "codeberg" => codeberg::detail(client, mod_id, key).await,
         "beamngforum" => beamngforum::detail(client, mod_id, key).await,
-        other => Err(SourceError::Unavailable(format!(
-            "источник `{other}` пока не реализован"
+        other => Err(SourceError::Unavailable(i18n::tf(
+            "источник `{0}` пока не реализован",
+            "source `{0}` is not implemented yet",
+            &[other],
         ))),
     }
 }
@@ -104,8 +131,10 @@ pub async fn resolve_download(
         "gitlab" => gitlab::resolve_download(client, key).await,
         "codeberg" => codeberg::resolve_download(client, key).await,
         "beamngforum" => beamngforum::resolve_download(client, key).await,
-        other => Err(SourceError::Unavailable(format!(
-            "источник `{other}` пока не реализован"
+        other => Err(SourceError::Unavailable(i18n::tf(
+            "источник `{0}` пока не реализован",
+            "source `{0}` is not implemented yet",
+            &[other],
         ))),
     }
 }

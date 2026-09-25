@@ -11,6 +11,9 @@ pub struct Config {
     pub installed_sort: Option<String>,
     pub installed_collapsed: Option<bool>,
     pub card_size: Option<String>,
+    /// Язык интерфейса: "ru" | "en". `None` до первой миграции/установки
+    /// (для уже существующих конфигов 0.3.0 остаётся русский).
+    pub language: Option<String>,
     /// Источники, которым пользователь разрешил сетевые запросы.
     /// `None` до первой инициализации (мигрируется при `load`).
     pub enabled_sources: Option<Vec<String>>,
@@ -21,10 +24,18 @@ pub struct Config {
 impl Config {
     pub fn config_path() -> Result<PathBuf> {
         let dir = dirs::config_dir()
-            .context("не удалось определить каталог конфигурации пользователя")?
+            .context(crate::i18n::t(
+                "не удалось определить каталог конфигурации пользователя",
+                "failed to determine the user config directory",
+            ))?
             .join("beamng-mod-downloader");
-        std::fs::create_dir_all(&dir)
-            .with_context(|| format!("не удалось создать {}", dir.display()))?;
+        std::fs::create_dir_all(&dir).with_context(|| {
+            crate::i18n::tf(
+                "не удалось создать {0}",
+                "failed to create {0}",
+                &[&dir.display().to_string()],
+            )
+        })?;
         Ok(dir.join("config.json"))
     }
 
@@ -37,6 +48,15 @@ impl Config {
             },
             Err(_) => Self::default(),
         };
+        if cfg.language.is_none() {
+            cfg.language = Some(if existed {
+                // Существующий конфиг v0.3.0 был русским — язык по умолчанию RU.
+                "ru".to_string()
+            } else {
+                // Первый запуск: язык определяется локалью системы.
+                crate::i18n::Lang::detect_env().as_str().to_string()
+            });
+        }
         cfg.init_and_sanitize_sources(existed);
         cfg
     }
@@ -44,8 +64,13 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path()?;
         let raw = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, raw)
-            .with_context(|| format!("не удалось записать {}", path.display()))
+        std::fs::write(&path, raw).with_context(|| {
+            crate::i18n::tf(
+                "не удалось записать {0}",
+                "failed to write {0}",
+                &[&path.display().to_string()],
+            )
+        })
     }
 
     /// Миграция и санитизация выбора источников.
@@ -77,6 +102,16 @@ impl Config {
         self.enabled_sources
             .clone()
             .unwrap_or_else(|| crate::sources::registry::default_enabled_ids(true))
+    }
+
+    /// Нормализованный язык интерфейса ("ru" | "en"); при пустом/неизвестном
+    /// значении — русский (back-compat с v0.3.0).
+    pub fn language_str(&self) -> String {
+        match self.language.as_deref() {
+            Some(v) if v == "en" || v == "en-US" || v == "en_US" => "en".to_string(),
+            Some(v) if v == "ru" || v == "ru-RU" || v == "ru_RU" => "ru".to_string(),
+            _ => "ru".to_string(),
+        }
     }
 }
 
@@ -179,5 +214,45 @@ mod tests {
         };
         cfg.init_and_sanitize_sources(false);
         assert_eq!(cfg.enabled_sources(), vec!["beamngweb".to_string()]);
+    }
+
+    #[test]
+    fn existing_config_keeps_russian_by_default() {
+        with_out_dirs("lang-legacy", || {
+            let dir = config_dir_path();
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("config.json"), r##"{"theme":"dark"}"##).unwrap();
+            let cfg = Config::load();
+            // Существующий конфиг без поля language — русский (back-compat).
+            assert_eq!(cfg.language_str(), "ru");
+        });
+    }
+
+    #[test]
+    fn explicit_language_is_preserved() {
+        with_out_dirs("lang-en", || {
+            let dir = config_dir_path();
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("config.json"), r##"{"language":"en"}"##).unwrap();
+            let cfg = Config::load();
+            assert_eq!(cfg.language_str(), "en");
+        });
+    }
+
+    #[test]
+    fn new_config_language_is_valid() {
+        with_out_dirs("lang-new", || {
+            let cfg = Config::load();
+            assert!(matches!(cfg.language_str().as_str(), "ru" | "en"));
+        });
+    }
+
+    #[test]
+    fn unknown_language_falls_back_to_russian() {
+        let cfg = Config {
+            language: Some("de".to_string()),
+            ..Config::default()
+        };
+        assert_eq!(cfg.language_str(), "ru");
     }
 }

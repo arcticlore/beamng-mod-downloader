@@ -16,8 +16,10 @@ pub fn list_installed(mods_folder: &Path) -> Result<Vec<InstalledMod>> {
 }
 
 fn collect_zips(root: &Path, dir: &Path, out: &mut Vec<InstalledMod>) -> Result<()> {
-    for entry in std::fs::read_dir(dir).context("не удалось прочитать каталог модов")?
-    {
+    for entry in std::fs::read_dir(dir).context(crate::i18n::t(
+        "не удалось прочитать каталог модов",
+        "failed to read the mods directory",
+    ))? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
@@ -62,5 +64,6 @@ fn collect_zips(root: &Path, dir: &Path, out: &mut Vec<InstalledMod>) -> Result<
 }
 
 pub fn remove_file(path: &str) -> Result<()> {
-    std::fs::remove_file(path).with_context(|| format!("не удалось удалить {path}"))
+    std::fs::remove_file(path)
+        .with_context(|| crate::i18n::tf("не удалось удалить {0}", "failed to remove {0}", &[path]))
 }

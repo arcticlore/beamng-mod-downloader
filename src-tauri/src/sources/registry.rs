@@ -64,7 +64,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
     let mut list = vec![
         SourceDescriptor {
             id: "beamngweb".into(),
-            label: "Официальный сайт BeamNG".into(),
+            label: crate::i18n::t("Официальный сайт BeamNG", "Official BeamNG website"),
             group: SourceGroup::Official,
             trust_level: TrustLevel::Official,
             enabled_by_default: true,
@@ -81,7 +81,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
         },
         SourceDescriptor {
             id: "github".into(),
-            label: "GitHub-релизы".into(),
+            label: crate::i18n::t("GitHub-релизы", "GitHub releases"),
             group: SourceGroup::Forges,
             trust_level: TrustLevel::VerifiedForge,
             enabled_by_default: true,
@@ -101,7 +101,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
         },
         SourceDescriptor {
             id: "gitlab".into(),
-            label: "GitLab-релизы".into(),
+            label: crate::i18n::t("GitLab-релизы", "GitLab releases"),
             group: SourceGroup::Forges,
             trust_level: TrustLevel::VerifiedForge,
             enabled_by_default: false,
@@ -118,7 +118,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
         },
         SourceDescriptor {
             id: "codeberg".into(),
-            label: "Codeberg".into(),
+            label: crate::i18n::t("Codeberg", "Codeberg"),
             group: SourceGroup::Forges,
             trust_level: TrustLevel::VerifiedForge,
             enabled_by_default: false,
@@ -135,19 +135,21 @@ pub fn registry() -> Vec<SourceDescriptor> {
         },
         SourceDescriptor {
             id: "worldofmods".into(),
-            label: "WorldOfMods".into(),
+            label: crate::i18n::t("WorldOfMods", "WorldOfMods"),
             group: SourceGroup::Community,
             trust_level: TrustLevel::ThirdParty,
             enabled_by_default: false,
             legacy_default: true,
             homepage: "https://www.worldofmods.com/beamng/".into(),
             terms_or_policy_url: None,
-            warning: Some(
+            warning: Some(crate::i18n::t(
                 "Сторонний неофициальный источник: контент не проверяется BeamNG. \
                  Файлы устанавливаются только после структурной проверки zip, \
-                 но доверять контенту предлагается на свой риск."
-                    .into(),
-            ),
+                 но доверять контенту предлагается на свой риск.",
+                "Third-party unofficial source: content is not reviewed by BeamNG. \
+                 Files are installed only after a structural zip check, \
+                 but trust in the content is at your own risk.",
+            )),
             install_mode: InstallMode::ModsZip,
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
@@ -157,19 +159,21 @@ pub fn registry() -> Vec<SourceDescriptor> {
         },
         SourceDescriptor {
             id: "beamngforum".into(),
-            label: "Форум BeamNG".into(),
+            label: crate::i18n::t("Форум BeamNG", "BeamNG forum"),
             group: SourceGroup::Official,
             trust_level: TrustLevel::Official,
             enabled_by_default: false,
             legacy_default: false,
             homepage: "https://www.beamng.com/community/".into(),
             terms_or_policy_url: Some("https://www.beamng.com/help/terms-of-service/".into()),
-            warning: Some(
+            warning: Some(crate::i18n::t(
                 "На форуме нет надёжного API поиска и привязки к zip-ассетам. \
                  Найти мод и ссылку на файл придётся вручную — приложение только \
-                 подсказывает, куда смотреть, и не устанавливает контент автоматически."
-                    .into(),
-            ),
+                 подсказывает, куда смотреть, и не устанавливает контент автоматически.",
+                "The forum has no reliable search API or zip-asset links. \
+                 You will find the mod and download link manually — the app only \
+                 points where to look and does not install content automatically.",
+            )),
             install_mode: InstallMode::ManualExternal,
             auth: SourceAuth::None,
             status: SourceStatus::Ready,

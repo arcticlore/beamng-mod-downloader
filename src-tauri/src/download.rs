@@ -110,7 +110,10 @@ async fn stream_to_part(
     cancel: &AtomicBool,
 ) -> Result<(String, u64)> {
     if cancel.load(Ordering::Relaxed) {
-        return Err(anyhow!("загрузка отменена пользователем"));
+        return Err(anyhow!(crate::i18n::t(
+            "загрузка отменена пользователем",
+            "download cancelled by the user"
+        )));
     }
 
     let mut req = client.get(url);
@@ -118,23 +121,34 @@ async fn stream_to_part(
         req = req.header(reqwest::header::REFERER, "https://www.worldofmods.com/");
     }
 
-    let response = req
-        .send()
-        .await
-        .context("не удалось установить соединение")?;
+    let response = req.send().await.context(crate::i18n::t(
+        "не удалось установить соединение",
+        "failed to establish a connection",
+    ))?;
     let status = response.status();
     if status == reqwest::StatusCode::UNAUTHORIZED {
-        return Err(anyhow!("репозиторий не принял токен (401)"));
+        return Err(anyhow!(crate::i18n::t(
+            "репозиторий не принял токен (401)",
+            "the repository rejected the token (401)"
+        )));
     }
     if !status.is_success() {
-        return Err(anyhow!("сервер ответил HTTP {status}"));
+        return Err(anyhow!(crate::i18n::tf(
+            "сервер ответил HTTP {0}",
+            "the server responded with HTTP {0}",
+            &[&status.to_string()]
+        )));
     }
 
     let total = response.content_length();
     let mut stream = response.bytes_stream();
-    let mut file = tokio::fs::File::create(&part)
-        .await
-        .with_context(|| format!("не удалось создать {}", part.display()))?;
+    let mut file = tokio::fs::File::create(&part).await.with_context(|| {
+        crate::i18n::tf(
+            "не удалось создать {0}",
+            "failed to create {0}",
+            &[&part.display().to_string()],
+        )
+    })?;
 
     let mut hasher = Sha256::new();
     let mut received: u64 = 0;
@@ -146,21 +160,28 @@ async fn stream_to_part(
         if cancel.load(Ordering::Relaxed) {
             drop(file);
             cleanup_part(part).await;
-            return Err(anyhow!("загрузка отменена пользователем"));
+            return Err(anyhow!(crate::i18n::t(
+                "загрузка отменена пользователем",
+                "download cancelled by the user"
+            )));
         }
         let chunk = match chunk {
             Ok(c) => c,
             Err(e) => {
                 drop(file);
                 cleanup_part(part).await;
-                return Err(anyhow!("ошибка чтения потока загрузки: {e}"));
+                return Err(anyhow!(crate::i18n::tf(
+                    "ошибка чтения потока загрузки: {0}",
+                    "error reading the download stream: {0}",
+                    &[&e.to_string()]
+                )));
             }
         };
         received += chunk.len() as u64;
         hasher.update(&chunk);
         file.write_all(&chunk)
             .await
-            .context("ошибка записи на диск")?;
+            .context(crate::i18n::t("ошибка записи на диск", "disk write error"))?;
 
         let elapsed = window_start.elapsed().as_secs_f64().max(0.001);
         let speed = ((received - last_received) as f64 / elapsed).max(0.0) as u64;
@@ -194,7 +215,10 @@ async fn stream_to_part(
 
     if received == 0 {
         cleanup_part(part).await;
-        return Err(anyhow!("файл пуст — похоже, ссылка устарела"));
+        return Err(anyhow!(crate::i18n::t(
+            "файл пуст — похоже, ссылка устарела",
+            "the file is empty — the link may be outdated"
+        )));
     }
 
     // Недосканный архив — не ставим битый мод: при известном размере требуем
@@ -202,16 +226,22 @@ async fn stream_to_part(
     if let Some(expected) = total {
         if received != expected {
             cleanup_part(part).await;
-            return Err(anyhow!(
-                "загрузка оборвалась: получено {received} из {expected} байт"
-            ));
+            return Err(anyhow!(crate::i18n::tf(
+                "загрузка оборвалась: получено {0} из {1} байт",
+                "download aborted: got {0} of {1} bytes",
+                &[&received.to_string(), &expected.to_string()],
+            )));
         }
     }
 
     // Структурная проверка zip: защита от усечённых/повреждённых архивов.
     crate::archive::validate_zip(part).map_err(|e| {
         let _ = std::fs::remove_file(part);
-        anyhow!("архив не прошёл проверку целостности: {e}")
+        anyhow!(crate::i18n::tf(
+            "архив не прошёл проверку целостности: {0}",
+            "the archive failed the integrity check: {0}",
+            &[&e.to_string()]
+        ))
     })?;
 
     Ok((hex, bytes))
@@ -221,15 +251,27 @@ async fn stream_to_part(
 async fn ensure_capacity(table: &DownloadTable, key: &str, filename: &str) -> Result<()> {
     let map = table.lock().await;
     if map.len() >= MAX_CONCURRENT_DOWNLOADS {
-        return Err(anyhow!(
-            "одновременно можно скачивать не более {MAX_CONCURRENT_DOWNLOADS} модов"
-        ));
+        return Err(anyhow!(crate::i18n::tfp(
+            "одновременно можно скачивать не более {0} мод",
+            "одновременно можно скачивать не более {0} мода",
+            "одновременно можно скачивать не более {0} модов",
+            "no more than {0} mods can be downloaded at once",
+            MAX_CONCURRENT_DOWNLOADS as u64,
+            &[&MAX_CONCURRENT_DOWNLOADS.to_string()],
+        )));
     }
     if map.contains_key(key) {
-        return Err(anyhow!("загрузка этого мода уже идёт"));
+        return Err(anyhow!(crate::i18n::t(
+            "загрузка этого мода уже идёт",
+            "this mod is already being downloaded"
+        )));
     }
     if map.values().any(|d| d.filename == filename) {
-        return Err(anyhow!("файл `{filename}` уже скачивается"));
+        return Err(anyhow!(crate::i18n::tf(
+            "файл `{0}` уже скачивается",
+            "the file `{0}` is already being downloaded",
+            &[filename]
+        )));
     }
     Ok(())
 }
@@ -252,7 +294,13 @@ fn unregister_cancel(cancels: &CancelTable, key: &str) {
 pub fn cancel(cancels: &CancelTable, key: &str) -> Result<()> {
     let flag = cancels
         .lock()
-        .map_err(|e| anyhow!("внутренняя ошибка: {e}"))?
+        .map_err(|e| {
+            anyhow!(crate::i18n::tf(
+                "внутренняя ошибка: {0}",
+                "internal error: {0}",
+                &[&e.to_string()]
+            ))
+        })?
         .get(key)
         .cloned();
     match flag {
@@ -261,7 +309,11 @@ pub fn cancel(cancels: &CancelTable, key: &str) -> Result<()> {
             f.store(true, Ordering::Relaxed);
             Ok(())
         }
-        None => Err(anyhow!("активная загрузка с ключом `{key}` не найдена")),
+        None => Err(anyhow!(crate::i18n::tf(
+            "активная загрузка с ключом `{0}` не найдена",
+            "no active download with key `{0}`",
+            &[key]
+        ))),
     }
 }
 
@@ -274,12 +326,22 @@ pub async fn start(
     req: InstallRequest,
 ) -> Result<String> {
     if !sources::validate_source(&req.source) {
-        return Err(anyhow!("неизвестный источник `{}`", req.source));
+        return Err(anyhow!(crate::i18n::tf(
+            "неизвестный источник `{0}`",
+            "unknown source `{0}`",
+            &[&req.source]
+        )));
     }
     let mods_dir = PathBuf::from(mods_folder);
     tokio::fs::create_dir_all(&mods_dir)
         .await
-        .with_context(|| format!("не удалось создать {}", mods_dir.display()))?;
+        .with_context(|| {
+            crate::i18n::tf(
+                "не удалось создать {0}",
+                "failed to create {0}",
+                &[&mods_dir.display().to_string()],
+            )
+        })?;
 
     let (url, filename, source_published) =
         sources::resolve_download(client, &req.source, &req.key)
@@ -287,17 +349,24 @@ pub async fn start(
             .map_err(|e| anyhow!("{e}"))?;
     info!("resolve: source={} url={url} → {filename}", req.source);
 
-    crate::urlguard::validate_url(&url)
-        .map_err(|e| anyhow!("SSRF-gate: загрузка запрещена: {e}"))?;
+    crate::urlguard::validate_url(&url).map_err(|e| {
+        anyhow!(crate::i18n::tf(
+            "SSRF-проверка: загрузка запрещена: {0}",
+            "SSRF check: download rejected: {0}",
+            &[&e.to_string()]
+        ))
+    })?;
 
     // Если файл уже установлен (есть в папке модов) — не перезаписываем архив,
     // а сообщаем пользователю
     let final_path = mods_dir.join(&filename);
     if final_path.exists() {
         warn!("мод `{filename}` уже установлен");
-        return Err(anyhow!(
-            "мод `{filename}` уже установлен в папке модов. Удалите его там, чтобы переустановить."
-        ));
+        return Err(anyhow!(crate::i18n::tf(
+            "мод `{0}` уже установлен в папке модов. Удалите его там, чтобы переустановить.",
+            "the mod `{0}` is already installed in the mods folder. Remove it there to reinstall.",
+            &[filename],
+        )));
     }
 
     let key = req.mod_id.clone();
@@ -445,26 +514,47 @@ pub async fn update(
         .get(filename)
         .cloned()
         .ok_or_else(|| {
-            anyhow!("мод `{filename}` не был установлен лаунчером — обновлять нечего")
+            anyhow!(crate::i18n::tf(
+                "мод `{0}` не был установлен лаунчером — обновлять нечего",
+                "the mod `{0}` was not installed by the launcher — nothing to update",
+                &[filename]
+            ))
         })?;
 
     // Сначала узнаём актуальную версию (дату публикации) — её и запишем в ledger.
     let detail = sources::detail(client, &entry.source, filename, &entry.key)
         .await
-        .map_err(|e| anyhow!("не удалось получить актуальную версию: {e}"))?;
+        .map_err(|e| {
+            anyhow!(crate::i18n::tf(
+                "не удалось получить актуальную версию: {0}",
+                "failed to get the current version: {0}",
+                &[&e.to_string()]
+            ))
+        })?;
     let latest_published = detail.item.published;
 
     let (url, latest_filename, _) = sources::resolve_download(client, &entry.source, &entry.key)
         .await
         .map_err(|e| anyhow!("{e}"))?;
-    crate::urlguard::validate_url(&url)
-        .map_err(|e| anyhow!("SSRF-gate: обновление запрещено: {e}"))?;
+    crate::urlguard::validate_url(&url).map_err(|e| {
+        anyhow!(crate::i18n::tf(
+            "SSRF-проверка: обновление запрещено: {0}",
+            "SSRF check: update rejected: {0}",
+            &[&e.to_string()]
+        ))
+    })?;
     info!("update: {filename} → {latest_filename} ({url})");
 
     let mods_dir = PathBuf::from(mods_folder);
     tokio::fs::create_dir_all(&mods_dir)
         .await
-        .with_context(|| format!("не удалось создать {}", mods_dir.display()))?;
+        .with_context(|| {
+            crate::i18n::tf(
+                "не удалось создать {0}",
+                "failed to create {0}",
+                &[&mods_dir.display().to_string()],
+            )
+        })?;
 
     let key = format!("update:{filename}");
     ensure_capacity(table, &key, &latest_filename).await?;
@@ -477,7 +567,7 @@ pub async fn update(
     } else {
         entry.name.clone()
     };
-    let name = format!("Обновление: {mod_name}");
+    let name = crate::i18n::tf("Обновление: {0}", "Update: {0}", &[&mod_name]);
     {
         let mut map = table.lock().await;
         map.insert(
@@ -565,7 +655,11 @@ pub async fn update(
                     Err(e) => {
                         dl.phase = Phase::Error;
                         dl.speed_bps = 0;
-                        dl.error = Some(format!("не удалось заменить архив: {e}"));
+                        dl.error = Some(crate::i18n::tf(
+                            "не удалось заменить архив: {0}",
+                            "failed to replace the archive: {0}",
+                            &[&e.to_string()],
+                        ));
                         let state = dl.to_state();
                         let _ = app.emit("download::finished", state);
                         error!("ошибка замены при обновлении {latest_filename}: {e}");

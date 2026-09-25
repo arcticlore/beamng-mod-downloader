@@ -27,18 +27,18 @@ pub fn categories() -> Vec<SourceCategory> {
         .map(|(id, _)| SourceCategory {
             id: id.to_string(),
             label: match *id {
-                "all" => "Все моды".to_string(),
-                "vehicles" => "Авто".to_string(),
-                "maps" => "Карты и террейны".to_string(),
-                "scenarios" => "Сценарии".to_string(),
-                "automation" => "Автоматизация".to_string(),
-                "land" => "Ландшафт".to_string(),
-                "skins" => "Скины".to_string(),
-                "sounds" => "Звуки".to_string(),
-                "ui" => "UI и приложения".to_string(),
-                "track" => "Track Builder".to_string(),
-                "license-plates" => "Номерные знаки".to_string(),
-                "mods-of-mods" => "Моды модов".to_string(),
+                "all" => crate::i18n::t("Все моды", "All mods"),
+                "vehicles" => crate::i18n::t("Авто", "Vehicles"),
+                "maps" => crate::i18n::t("Карты и террейны", "Maps and terrains"),
+                "scenarios" => crate::i18n::t("Сценарии", "Scenarios"),
+                "automation" => crate::i18n::t("Автоматизация", "Automation"),
+                "land" => crate::i18n::t("Ландшафт", "Landscape"),
+                "skins" => crate::i18n::t("Скины", "Skins"),
+                "sounds" => crate::i18n::t("Звуки", "Sounds"),
+                "ui" => crate::i18n::t("UI и приложения", "UI and apps"),
+                "track" => crate::i18n::t("Track Builder", "Track Builder"),
+                "license-plates" => crate::i18n::t("Номерные знаки", "License plates"),
+                "mods-of-mods" => crate::i18n::t("Моды модов", "Mods of mods"),
                 other => other.to_string(),
             },
         })
@@ -400,7 +400,10 @@ pub async fn resolve_download(
         url = page_payload(&html).download_url;
     }
     let url = url.ok_or_else(|| {
-        SourceError::Parse("не найдена кнопка скачивания на странице мода".into())
+        SourceError::Parse(crate::i18n::t(
+            "не найдена кнопка скачивания на странице мода",
+            "no download button found on the mod page",
+        ))
     })?;
 
     let published = published_from_page(&html);
