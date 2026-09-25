@@ -18,7 +18,7 @@ use crate::sources::SourceError;
 pub fn categories() -> Vec<SourceCategory> {
     vec![SourceCategory {
         id: "all".to_string(),
-        label: "Общий форум".to_string(),
+        label: crate::i18n::t("Общий форум", "General forum"),
     }]
 }
 
@@ -29,9 +29,10 @@ pub async fn search(
     _page: u32,
     _order: Option<&str>,
 ) -> Result<ModSearchResult, SourceError> {
-    Err(SourceError::Unavailable(
-        "поиск на форуме BeamNG требует авторизации — откройте форум в браузере и воспользуйтесь встроенным поиском".to_string(),
-    ))
+    Err(SourceError::Unavailable(crate::i18n::t(
+        "поиск на форуме BeamNG требует авторизации — откройте форум в браузере и воспользуйтесь встроенным поиском",
+        "searching the BeamNG forum requires sign-in — open the forum in your browser and use its built-in search",
+    )))
 }
 
 pub async fn detail(
@@ -39,18 +40,20 @@ pub async fn detail(
     _mod_id: &str,
     _key: &str,
 ) -> Result<ModDetail, SourceError> {
-    Err(SourceError::Unavailable(
-        "обзор модов на форуме BeamNG доступен только в браузере после входа".to_string(),
-    ))
+    Err(SourceError::Unavailable(crate::i18n::t(
+        "обзор модов на форуме BeamNG доступен только в браузере после входа",
+        "browsing mods on the BeamNG forum is only available in a browser after sign-in",
+    )))
 }
 
 pub async fn resolve_download(
     _client: &reqwest::Client,
     _key: &str,
 ) -> Result<(String, String, Option<String>), SourceError> {
-    Err(SourceError::Unavailable(
-        "автоматическая установка с форума недоступна: attachments требуют логин".to_string(),
-    ))
+    Err(SourceError::Unavailable(crate::i18n::t(
+        "автоматическая установка с форума недоступна: attachments требуют логин",
+        "automatic install from the forum is unavailable: attachments require sign-in",
+    )))
 }
 
 #[cfg(test)]

@@ -8,17 +8,19 @@ import {
 } from "../api";
 import type { AppSettings, InstalledMod, IntegrityReport, ModUpdate } from "../types";
 import { formatBytes } from "../types";
+import { useI18n } from "../i18n/LanguageContext";
 
 function IntegrityBadge({ report }: { report: IntegrityReport }) {
+  const { t } = useI18n();
   const bad = !report.zipOk || report.hashOk === false;
   const title = bad
     ? report.hashOk === false
-      ? "Файл изменён или заменён после установки лаунчером"
-      : report.error ?? "Архив повреждён или усечён"
-    : "Целостность подтверждена";
+      ? t("integrity_bad_modified")
+      : (report.error ?? t("integrity_bad_archive"))
+    : t("integrity_ok_title");
   return (
     <span className={`badge ${bad ? "badge-error" : "badge-ok"}`} title={title}>
-      {bad ? "Целостность нарушена" : "OK"}
+      {bad ? t("integrity_bad_label") : t("integrity_ok_label")}
     </span>
   );
 }
@@ -30,6 +32,7 @@ export function InstalledPanel({
   onOpenSettings: () => void;
   settings: AppSettings | null;
 }) {
+  const { t, tp, lang } = useI18n();
   const [items, setItems] = useState<InstalledMod[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(
@@ -120,7 +123,10 @@ export function InstalledPanel({
     const fine = list.filter(
       (r) => r.zipOk && (r.hashOk === true || r.hashOk == null),
     ).length;
-    integritySummary = `Целостность: ${fine}/${list.length}`;
+    integritySummary = t("installed_integrity_summary", {
+      fine,
+      total: list.length,
+    });
   }
 
   if (error && items?.length === 0) {
@@ -128,20 +134,20 @@ export function InstalledPanel({
       <div className="panel-empty">
         <p>{error}</p>
         <button className="btn btn-primary" onClick={onOpenSettings}>
-          Выбрать папку с модами
+          {t("installed_select_folder")}
         </button>
       </div>
     );
   }
 
-  if (items === null) return <div className="browser-loading">Загрузка…</div>;
+  if (items === null) return <div className="browser-loading">{t("installed_loading")}</div>;
 
   if (items.length === 0) {
     return (
       <div className="panel-empty">
-        <p>В папке модов пока ничего нет. Выберите моды в вкладках выше и установите.</p>
+        <p>{t("installed_empty")}</p>
         <button className="btn btn-primary" onClick={onOpenSettings}>
-          Изменить папку модов
+          {t("installed_change_folder")}
         </button>
       </div>
     );
@@ -158,20 +164,24 @@ export function InstalledPanel({
   return (
     <div className="installed">
       <div className="installed-summary">
-        Архивов: {items.length} · {formatBytes(total)} · вручную:
-        {items.length - managedCount}
+        {tp("archives_count", items.length)} · {formatBytes(total, lang)} ·{" "}
+        {t("installed_manual_count", { n: items.length - managedCount })}
         {integritySummary && <span className="text-muted"> · {integritySummary}</span>}
         <button className="btn btn-sm" onClick={() => setCollapsed((v) => !v)}>
-          {collapsed ? "Развернуть" : "Свернуть"}
+          {collapsed ? t("installed_expand") : t("installed_collapse")}
         </button>
         {!collapsed && (
           <button
             className="btn btn-sm"
             disabled={checking}
             onClick={() => runUpdateCheck(items ?? [])}
-            title="Сравнить версии установленных модов с источниками"
+            title={t("updates_check_title")}
           >
-            {checking ? "Проверяю…" : updates.size ? `Обновления: ${updateCount}` : "Проверить обновления"}
+            {checking
+              ? t("updates_checking")
+              : updates.size
+                ? t("updates_count", { n: updateCount })
+                : t("updates_check")}
           </button>
         )}
         {!collapsed && (
@@ -179,14 +189,14 @@ export function InstalledPanel({
             className="btn btn-sm"
             disabled={verifying}
             onClick={runIntegrity}
-            title="Проверить zip-структуру и SHA-256 установленных архивов"
+            title={t("integrity_check_title")}
           >
-            {verifying ? "Проверяю…" : "Проверить целостность"}
+            {verifying ? t("integrity_checking") : t("integrity_check")}
           </button>
         )}
         {!collapsed && (
           <button className="btn btn-sm" onClick={refresh}>
-            Обновить
+            {t("installed_refresh")}
           </button>
         )}
       </div>
@@ -194,11 +204,11 @@ export function InstalledPanel({
         <table className="installed-table">
           <thead>
             <tr>
-              <th>Файл</th>
-              <th>Источник</th>
-              <th>Размер</th>
-              <th>Изменён</th>
-              <th>Версия</th>
+              <th>{t("col_file")}</th>
+              <th>{t("col_source")}</th>
+              <th>{t("col_size")}</th>
+              <th>{t("col_modified")}</th>
+              <th>{t("col_version")}</th>
               <th></th>
             </tr>
           </thead>
@@ -210,16 +220,25 @@ export function InstalledPanel({
                   <td title={m.path}>{m.filename}</td>
                   <td>
                     <span className={`badge ${m.source === "repo" ? "badge-repo" : "badge-local"}`}>
-                      {m.source === "repo" ? "репо" : m.key ? "лаунчер" : "вручную"}
+                      {m.source === "repo"
+                        ? t("src_repo")
+                        : m.key
+                          ? t("src_launcher")
+                          : t("src_manual")}
                     </span>
                   </td>
-                  <td>{formatBytes(m.sizeBytes)}</td>
-                  <td>{new Date(m.modified * 1000).toLocaleDateString("ru-RU")}</td>
+                  <td>{formatBytes(m.sizeBytes, lang)}</td>
+                  <td>{new Date(m.modified * 1000).toLocaleDateString(lang === "en" ? "en-US" : "ru-RU")}</td>
                   <td>
                     {m.key ? (
                       up?.hasUpdate ? (
-                        <span className="badge badge-ok" title={`На сайте новее: ${up.latestPublished ?? "?"}`}>
-                          Есть обновление ↓
+                        <span
+                          className="badge badge-ok"
+                          title={t("update_title_newer", {
+                            date: up.latestPublished ?? "?",
+                          })}
+                        >
+                          {t("has_update")}
                         </span>
                       ) : (
                         <span className="text-muted">
@@ -240,7 +259,7 @@ export function InstalledPanel({
                         disabled={updating.has(m.filename)}
                         onClick={() => doUpdate(m)}
                       >
-                        {updating.has(m.filename) ? "Обновляю…" : "Обновить"}
+                        {updating.has(m.filename) ? t("updating") : t("update_btn")}
                       </button>
                     )}
                     <button
@@ -259,7 +278,7 @@ export function InstalledPanel({
                         }
                       }}
                     >
-                      Удалить
+                      {t("delete_btn")}
                     </button>
                   </td>
                 </tr>

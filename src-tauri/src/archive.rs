@@ -38,14 +38,23 @@ pub fn to_hex(bytes: &[u8]) -> String {
 
 /// SHA-256 файла (hex).
 pub fn sha256_file(path: &Path) -> Result<String> {
-    let mut f = std::fs::File::open(path)
-        .with_context(|| format!("не удалось открыть {}", path.display()))?;
+    let mut f = std::fs::File::open(path).with_context(|| {
+        crate::i18n::tf(
+            "не удалось открыть {0}",
+            "failed to open {0}",
+            &[&path.display().to_string()],
+        )
+    })?;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 64 * 1024];
     loop {
-        let n = f
-            .read(&mut buf)
-            .with_context(|| format!("ошибка чтения {}", path.display()))?;
+        let n = f.read(&mut buf).with_context(|| {
+            crate::i18n::tf(
+                "ошибка чтения {0}",
+                "read error {0}",
+                &[&path.display().to_string()],
+            )
+        })?;
         if n == 0 {
             break;
         }
@@ -64,77 +73,128 @@ fn rd_u32(b: &[u8], at: usize) -> u32 {
 
 /// Структурная проверка zip-архива: EOCD + центральный каталог.
 pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
-    let mut f = std::fs::File::open(path)
-        .with_context(|| format!("не удалось открыть {}", path.display()))?;
+    let mut f = std::fs::File::open(path).with_context(|| {
+        crate::i18n::tf(
+            "не удалось открыть {0}",
+            "failed to open {0}",
+            &[&path.display().to_string()],
+        )
+    })?;
     let file_len = f
         .metadata()
-        .with_context(|| format!("не удалось получить размер {}", path.display()))?
+        .with_context(|| {
+            crate::i18n::tf(
+                "не удалось получить размер {0}",
+                "failed to get the size of {0}",
+                &[&path.display().to_string()],
+            )
+        })?
         .len();
     if file_len < EOCD_MIN {
-        return Err(anyhow!("файл меньше минимального размера zip-архива"));
+        return Err(anyhow!(crate::i18n::t(
+            "файл меньше минимального размера zip-архива",
+            "file smaller than the minimum zip size"
+        )));
     }
 
     // Комментарий после EOCD допустим до 64 КБ — ищем сигнатуру с конца файла.
     let scan = file_len.min(EOCD_MIN + MAX_COMMENT) as usize;
     let mut tail = vec![0u8; scan];
     f.seek(SeekFrom::End(-(scan as i64)))?;
-    f.read_exact(&mut tail)
-        .with_context(|| format!("не удалось прочитать хвост {}", path.display()))?;
+    f.read_exact(&mut tail).with_context(|| {
+        crate::i18n::tf(
+            "не удалось прочитать хвост {0}",
+            "failed to read the tail of {0}",
+            &[&path.display().to_string()],
+        )
+    })?;
     let rel = tail
         .iter()
         .rposition(|b| *b == 0x50)
-        .and_then(|i| {
-            if i + 4 <= tail.len() && tail[i..i + 4] == EOCD_SIG {
-                Some(i)
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| anyhow!("не найден маркер конца архива (EOCD) — файл не zip"))?;
+        .filter(|&i| i + 4 <= tail.len() && tail[i..i + 4] == EOCD_SIG)
+        .ok_or_else(|| {
+            anyhow!(crate::i18n::t(
+                "не найден маркер конца архива (EOCD) — файл не zip",
+                "no end-of-archive marker (EOCD) found — not a zip file"
+            ))
+        })?;
     let eocd_at = (file_len as i64 - scan as i64 + rel as i64) as u64;
 
     if eocd_at + EOCD_MIN > file_len {
-        return Err(anyhow!("маркер конца архива выходит за пределы файла"));
+        return Err(anyhow!(crate::i18n::t(
+            "маркер конца архива выходит за пределы файла",
+            "end-of-archive marker exceeds the file bounds"
+        )));
     }
     if rd_u16(&tail, rel + 4) != 0 || rd_u16(&tail, rel + 6) != 0 {
-        return Err(anyhow!("многодисковые архивы не поддерживаются"));
+        return Err(anyhow!(crate::i18n::t(
+            "многодисковые архивы не поддерживаются",
+            "multi-disk archives are not supported"
+        )));
     }
     let comment_len = rd_u16(&tail, rel + 20) as u64;
     if eocd_at + EOCD_MIN + comment_len != file_len {
-        return Err(anyhow!("хвост файла не соответствует комментарию EOCD"));
+        return Err(anyhow!(crate::i18n::t(
+            "хвост файла не соответствует комментарию EOCD",
+            "file tail does not match the EOCD comment"
+        )));
     }
 
     let entries = rd_u16(&tail, rel + 10) as usize;
     if entries == 0 {
-        return Err(anyhow!("в архиве нет записей"));
+        return Err(anyhow!(crate::i18n::t(
+            "в архиве нет записей",
+            "the archive has no entries"
+        )));
     }
     let cd_size = rd_u32(&tail, rel + 12) as u64;
     let cd_offset = rd_u32(&tail, rel + 16) as u64;
-    let cd_end = cd_offset
-        .checked_add(cd_size)
-        .ok_or_else(|| anyhow!("переполнение размера центрального каталога"))?;
+    let cd_end = cd_offset.checked_add(cd_size).ok_or_else(|| {
+        anyhow!(crate::i18n::t(
+            "переполнение размера центрального каталога",
+            "central directory size overflow"
+        ))
+    })?;
     if cd_end != eocd_at {
-        return Err(anyhow!(
-            "центральный каталог не стыкуется с концом архива (offset={cd_offset}, size={cd_size}, eocd={eocd_at})"
-        ));
+        return Err(anyhow!(crate::i18n::tf(
+            "центральный каталог не стыкуется с концом архива (offset={0}, size={1}, eocd={2})",
+            "central directory does not align with the archive end (offset={0}, size={1}, eocd={2})",
+            &[&cd_offset.to_string(), &cd_size.to_string(), &eocd_at.to_string()],
+        )));
     }
     if cd_size == 0 {
-        return Err(anyhow!("центральный каталог пуст"));
+        return Err(anyhow!(crate::i18n::t(
+            "центральный каталог пуст",
+            "central directory is empty"
+        )));
     }
     let cd_len = cd_size as usize;
     let mut cd = vec![0u8; cd_len];
     f.seek(SeekFrom::Start(cd_offset))?;
-    f.read_exact(&mut cd)
-        .with_context(|| format!("не удалось прочитать каталог {}", path.display()))?;
+    f.read_exact(&mut cd).with_context(|| {
+        crate::i18n::tf(
+            "не удалось прочитать каталог {0}",
+            "failed to read the directory of {0}",
+            &[&path.display().to_string()],
+        )
+    })?;
 
     let mut pos = 0usize;
     let mut total_uncompressed: u64 = 0;
     for i in 0..entries {
         if pos + 46 > cd_len {
-            return Err(anyhow!("запись {} обрывается в каталоге", i + 1));
+            return Err(anyhow!(crate::i18n::tf(
+                "запись {0} обрывается в каталоге",
+                "entry {0} is truncated in the directory",
+                &[&(i + 1).to_string()]
+            )));
         }
         if cd[pos..pos + 4] != CD_SIG {
-            return Err(anyhow!("битая сигнатура записи {} в каталоге", i + 1));
+            return Err(anyhow!(crate::i18n::tf(
+                "битая сигнатура записи {0} в каталоге",
+                "bad signature of entry {0} in the directory",
+                &[&(i + 1).to_string()]
+            )));
         }
         let name_len = rd_u16(&cd, pos + 28) as usize;
         let extra_len = rd_u16(&cd, pos + 30) as usize;
@@ -144,45 +204,63 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
         let local_off = rd_u32(&cd, pos + 42) as u64;
         pos += 46 + name_len + extra_len + entry_comment_len;
         if pos > cd_len {
-            return Err(anyhow!("запись {} выходит за пределы каталога", i + 1));
+            return Err(anyhow!(crate::i18n::tf(
+                "запись {0} выходит за пределы каталога",
+                "entry {0} exceeds the directory bounds",
+                &[&(i + 1).to_string()]
+            )));
         }
 
         // Локальный заголовок обязан лежать до центрального каталога.
         if local_off + 30 > cd_offset {
-            return Err(anyhow!(
-                "запись {}: локальный заголовок за пределами каталога",
-                i + 1
-            ));
+            return Err(anyhow!(crate::i18n::tf(
+                "запись {0}: локальный заголовок за пределами каталога",
+                "entry {0}: local header is outside the directory",
+                &[&(i + 1).to_string()],
+            )));
         }
         let mut lfh = [0u8; 30];
         f.seek(SeekFrom::Start(local_off))?;
         f.read_exact(&mut lfh).with_context(|| {
-            format!("не удалось прочитать локальный заголовок записи {}", i + 1)
+            crate::i18n::tf(
+                "не удалось прочитать локальный заголовок записи {0}",
+                "failed to read the local header of entry {0}",
+                &[&(i + 1).to_string()],
+            )
         })?;
         if lfh[0..4] != LFH_SIG {
-            return Err(anyhow!(
-                "запись {}: неверная сигнатура локального заголовка",
-                i + 1
-            ));
+            return Err(anyhow!(crate::i18n::tf(
+                "запись {0}: неверная сигнатура локального заголовка",
+                "entry {0}: invalid local header signature",
+                &[&(i + 1).to_string()],
+            )));
         }
         let l_name_len = u16::from_le_bytes([lfh[26], lfh[27]]) as u64;
         let l_extra_len = u16::from_le_bytes([lfh[28], lfh[29]]) as u64;
         // ZIP64 маркер размера — расшифровывать не умеем, но хуже не делаем.
         if u_size != 0xffff_ffff {
-            total_uncompressed = total_uncompressed
-                .checked_add(u_size)
-                .ok_or_else(|| anyhow!("переполнение суммарного размера распакованных данных"))?;
+            total_uncompressed = total_uncompressed.checked_add(u_size).ok_or_else(|| {
+                anyhow!(crate::i18n::t(
+                    "переполнение суммарного размера распакованных данных",
+                    "total uncompressed size overflow"
+                ))
+            })?;
             let data_end = local_off + 30 + l_name_len + l_extra_len + c_size;
             if data_end > cd_offset {
-                return Err(anyhow!("запись {}: данные выходят за каталог", i + 1));
+                return Err(anyhow!(crate::i18n::tf(
+                    "запись {0}: данные выходят за каталог",
+                    "entry {0}: data exceeds the directory",
+                    &[&(i + 1).to_string()]
+                )));
             }
         }
     }
     if pos != cd_len {
-        return Err(anyhow!(
-            "центральный каталог длиннее, чем описано записей (лишние {} байт)",
-            cd_len - pos
-        ));
+        return Err(anyhow!(crate::i18n::tf(
+            "центральный каталог длиннее, чем описано записей (лишние {0} байт)",
+            "central directory is longer than described by entries ({0} extra bytes)",
+            &[&(cd_len - pos).to_string()],
+        )));
     }
 
     Ok(ZipSummary {
@@ -299,7 +377,7 @@ mod tests {
     fn bad_cd_size_rejected() {
         let mut raw = build_zip("mod/main.txt", b"hello beamng");
         let cd_size_lsb = raw.len() - 22 + 12;
-        raw[cd_size_lsb as usize] ^= 0x01;
+        raw[cd_size_lsb] ^= 0x01;
         let path = write_temp(&raw, "badsize");
         assert!(validate_zip(&path).is_err());
         cleanup(&path);

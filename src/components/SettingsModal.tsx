@@ -20,10 +20,16 @@ import {
   toggleSourceSelection,
   trustLabel,
 } from "../sources";
+import { useI18n } from "../i18n/LanguageContext";
 import type { AppSettings, ModsFolderCandidate, SourceGroup } from "../types";
 import { CARD_SIZES, INSTALLED_SORTS, THEMES } from "../types";
 
 const GROUPS: SourceGroup[] = ["official", "forges", "community", "custom"];
+
+const LANGUAGES: { id: "ru" | "en"; labelKey: "language_ru" | "language_en" }[] = [
+  { id: "ru", labelKey: "language_ru" },
+  { id: "en", labelKey: "language_en" },
+];
 
 interface Props {
   onClose: () => void;
@@ -31,6 +37,7 @@ interface Props {
 }
 
 export function SettingsModal({ onClose, onChanged }: Props) {
+  const { t } = useI18n();
   const [current, setCurrent] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<ModsFolderCandidate[]>([]);
   const [manual, setManual] = useState("");
@@ -59,15 +66,17 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     };
   }, []);
 
+  const showMsg = (ok: boolean, text: string) => setMsg({ ok, text });
+
   const saveSettings = async (next: AppSettings, quiet = false) => {
     setSettingsState(next);
     applyAppearance(next);
     try {
       await setSettings(next);
       onChanged();
-      if (!quiet) setMsg({ ok: true, text: "Настройки интерфейса сохранены" });
+      if (!quiet) showMsg(true, t("saved_settings"));
     } catch (e) {
-      setMsg({ ok: false, text: String(e) });
+      showMsg(false, String(e));
     }
   };
 
@@ -82,10 +91,10 @@ export function SettingsModal({ onClose, onChanged }: Props) {
       }
       setCurrent(path);
       setManual(path);
-      setMsg({ ok: true, text: "Папка модов сохранена" });
+      showMsg(true, t("saved_folder"));
       onChanged();
     } catch (e) {
-      setMsg({ ok: false, text: String(e) });
+      showMsg(false, String(e));
     } finally {
       setBusy(false);
     }
@@ -96,7 +105,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     try {
       await openLogDir();
     } catch (e) {
-      setMsg({ ok: false, text: String(e) });
+      showMsg(false, String(e));
     }
   };
 
@@ -131,16 +140,16 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     setSourcesBusy(true);
     try {
       await fn();
-      setMsg({ ok: true, text: okText });
+      showMsg(true, okText);
     } catch (e) {
-      setMsg({ ok: false, text: String(e) });
+      showMsg(false, String(e));
     } finally {
       setSourcesBusy(false);
     }
   };
 
   const toggleEnabled = (id: string) =>
-    runSource(() => setEnabled(id, !enabledSet.has(id)), "Выбор источников сохранён");
+    runSource(() => setEnabled(id, !enabledSet.has(id)), t("msg_sources_saved"));
 
   const toggleSelected = (id: string) =>
     runSource(
@@ -153,7 +162,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
             id,
           ),
         ),
-      "Поиск по источникам обновлён",
+      t("msg_search_updated"),
     );
 
   const applyPresetNow = (
@@ -161,7 +170,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
   ) => {
     const list = applyPreset(preset, registry, [...enabledSet]);
     const next = canonicalizeSelection(searchCapable, list);
-    return runSource(() => setSelected(next), "Пресет применён");
+    return runSource(() => setSelected(next), t("msg_preset_applied"));
   };
 
   const groups = useMemo(() => {
@@ -179,19 +188,16 @@ export function SettingsModal({ onClose, onChanged }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-settings" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
-        <h2>Настройки</h2>
+        <h2>{t("settings_title")}</h2>
 
         <section>
-          <h3>Папка с модами BeamNG.drive</h3>
+          <h3>{t("folder_section_title")}</h3>
           {current && (
             <div className="current-path">
-              Текущая: <code>{current}</code>
+              {t("folder_current")} <code>{current}</code>
             </div>
           )}
-          <p className="hint">
-            Приложение само ищет папки модов в стандартных местах (Linux, Windows, macOS).
-            Выберите вариант ниже или укажите путь вручную.
-          </p>
+          <p className="hint">{t("folder_hint")}</p>
           {candidates.length > 0 ? (
             <div className="candidate-list">
               {candidates.map((c) => (
@@ -208,7 +214,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
               ))}
             </div>
           ) : (
-            <div className="hint">Автоматически ничего не найдено — укажите путь вручную.</div>
+            <div className="hint">{t("folder_none_found")}</div>
           )}
           <div className="manual-row">
             <input
@@ -222,30 +228,24 @@ export function SettingsModal({ onClose, onChanged }: Props) {
               disabled={busy || !manual.trim()}
               onClick={() => applyFolder(manual.trim(), false)}
             >
-              Применить
+              {t("folder_apply")}
             </button>
             <button
               className="btn"
               disabled={busy || !manual.trim()}
-              title="Сохранить путь без проверки .zip"
+              title={t("folder_force_title")}
               onClick={() => applyFolder(manual.trim(), true)}
             >
-              Принудительно
+              {t("folder_force")}
             </button>
           </div>
         </section>
 
         <section>
-          <h3>Источники</h3>
-          <p className="hint">
-            Источник должен быть <b>включён</b>, чтобы приложение обращалось к нему в сеть
-            (поиск, описание, установка, обновления). Отключённый источник никогда не
-            запрашивается. <b>Поиск</b> определяет, в каких включённых источниках искать.
-            Если «поиск» включён у всех — поиск автоматически охватывает все включённые
-            источники.
-          </p>
+          <h3>{t("sources_section_title")}</h3>
+          <p className="hint" dangerouslySetInnerHTML={{ __html: t("sources_hint") }} />
 
-          {sourcesLoading && <div className="hint">Загрузка источников…</div>}
+          {sourcesLoading && <div className="hint">{t("sources_loading")}</div>}
           {!sourcesLoading && sourcesError && (
             <div className="banner banner-error">{sourcesError}</div>
           )}
@@ -256,41 +256,41 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                 <button
                   className="btn btn-sm"
                   disabled={!anyEnabled || sourcesBusy}
-                  title="Официальный сайт BeamNG и open-source forges"
+                  title={t("preset_recommended_title")}
                   onClick={() => applyPresetNow("recommended")}
                 >
-                  Рекомендуемые
+                  {t("preset_recommended")}
                 </button>
                 <button
                   className="btn btn-sm"
                   disabled={!anyEnabled || sourcesBusy}
                   onClick={() => applyPresetNow("official_forges")}
                 >
-                  Официальные + forges
+                  {t("preset_official_forges")}
                 </button>
                 <button
                   className="btn btn-sm"
                   disabled={!anyEnabled || sourcesBusy}
                   onClick={() => applyPresetNow("all_configured")}
                 >
-                  Все включённые
+                  {t("preset_all_configured")}
                 </button>
                 <button
                   className="btn btn-sm"
                   disabled={!anyEnabled || sourcesBusy}
                   onClick={() => applyPresetNow("clear")}
                 >
-                  Очистить
+                  {t("preset_clear")}
                 </button>
                 <button
                   className="btn btn-sm"
                   disabled={sourcesBusy}
-                  title="Включить рекомендуемые источники и сбросить выбор поиска"
+                  title={t("preset_reset_defaults_title")}
                   onClick={() =>
-                    runSource(resetDefaults, "Выбор источников сброшен к рекомендуемым")
+                    runSource(resetDefaults, t("msg_sources_reset"))
                   }
                 >
-                  Сброс к defaults
+                  {t("preset_reset_defaults")}
                 </button>
               </div>
 
@@ -298,10 +298,11 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                 (g) =>
                   groups.has(g) && (
                     <div key={g} className="source-group">
-                      <div className="source-group-label">{groupLabel(g)}</div>
+                      <div className="source-group-label">{t(groupLabel(g))}</div>
                       {groups.get(g)!.map((d) => {
                         const isEnabled = enabledSet.has(d.id);
                         const isSelected = selectedSet.has(d.id);
+                        const trustKey = trustLabel(d.trustLevel);
                         return (
                           <div
                             key={d.id}
@@ -311,13 +312,13 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                               <span className="source-item-name">{d.label}</span>
                               <span
                                 className={`trust-badge trust-${d.trustLevel}`}
-                                title={`Доверие: ${trustLabel(d.trustLevel)}`}
+                                title={t("trust_badge_title", { level: t(trustKey) })}
                               >
-                                {trustLabel(d.trustLevel)}
+                                {t(trustKey)}
                               </span>
                               {d.status !== "ready" && (
                                 <span className="source-status-badge">
-                                  {statusLabel(d.status)}
+                                  {t(statusLabel(d.status))}
                                 </span>
                               )}
                             </div>
@@ -326,8 +327,8 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                                 className="switch-label"
                                 title={
                                   isEnabled
-                                    ? "Отключить: приложение перестанет обращаться к источнику"
-                                    : "Включить источник (разрешить сетевые запросы)"
+                                    ? t("toggle_enable_on_title")
+                                    : t("toggle_enable_off_title")
                                 }
                               >
                                 <input
@@ -338,16 +339,16 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                                   onChange={() => toggleEnabled(d.id)}
                                 />
                                 <span className="switch-box" />
-                                <span>Включён</span>
+                                <span>{t("source_enabled")}</span>
                               </label>
                               <label
                                 className="switch-label switch-label-secondary"
                                 title={
                                   !d.capabilities.search
-                                    ? "Поиск не поддерживается — только ручная установка"
+                                    ? t("toggle_search_unsupported_title")
                                     : isEnabled
-                                      ? "Искать моды в этом источнике"
-                                      : "Сначала включите источник"
+                                      ? t("toggle_search_on_title")
+                                      : t("toggle_search_disabled_title")
                                 }
                               >
                                 <input
@@ -362,8 +363,8 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                                 <span className="switch-box" />
                                 <span>
                                   {d.capabilities.search
-                                    ? "Поиск"
-                                    : "Поиск не поддерживается"}
+                                    ? t("source_search")
+                                    : t("source_search_unsupported")}
                                 </span>
                               </label>
                             </div>
@@ -377,30 +378,39 @@ export function SettingsModal({ onClose, onChanged }: Props) {
                   ),
               )}
               {selectedIsAll && (
-                <div className="hint">
-                  Поиск активен во всех включённых источниках с поддержкой поиска.
-                  Снимите «Поиск» у источника, чтобы искать в подмножестве.
-                </div>
+                <div className="hint">{t("sources_search_all_hint")}</div>
               )}
             </>
           )}
         </section>
 
         <section>
-          <h3>Внешний вид</h3>
-          <div className="hint">Тема:</div>
+          <h3>{t("appearance_section_title")}</h3>
+          <div className="hint">{t("language_label")}</div>
           <div className="theme-toggle">
-            {THEMES.map((t) => (
+            {LANGUAGES.map((l) => (
               <button
-                key={t.id}
-                className={`btn ${(settings.theme ?? "dark") === t.id ? "btn-active" : ""}`}
-                onClick={() => saveSettings({ ...settings, theme: t.id })}
+                key={l.id}
+                className={`btn ${(settings.language ?? "ru") === l.id ? "btn-active" : ""}`}
+                onClick={() => saveSettings({ ...settings, language: l.id })}
               >
-                {t.label}
+                {t(l.labelKey)}
               </button>
             ))}
           </div>
-          <div className="hint" style={{ marginTop: 12 }}>Акцентный цвет:</div>
+          <div className="hint">{t("appearance_theme")}</div>
+          <div className="theme-toggle">
+            {THEMES.map((opt) => (
+              <button
+                key={opt.id}
+                className={`btn ${(settings.theme ?? "dark") === opt.id ? "btn-active" : ""}`}
+                onClick={() => saveSettings({ ...settings, theme: opt.id })}
+              >
+                {t(opt.labelKey)}
+              </button>
+            ))}
+          </div>
+          <div className="hint">{t("appearance_accent")}</div>
           <div className="accent-row">
             {ACCENT_PRESETS.map((c) => (
               <button
@@ -416,10 +426,10 @@ export function SettingsModal({ onClose, onChanged }: Props) {
               className="color-input"
               value={settings.accent ?? "#4f8cff"}
               onChange={(e) => saveSettings({ ...settings, accent: e.target.value })}
-              title="Свой цвет"
+              title={t("appearance_custom_color")}
             />
           </div>
-          <div className="hint" style={{ marginTop: 12 }}>Панель установленных и карточки:</div>
+          <div className="hint">{t("appearance_cards")}</div>
           <div className="manual-row">
             <select
               className="category-select"
@@ -428,7 +438,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
             >
               {INSTALLED_SORTS.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.label}
+                  {t(s.labelKey)}
                 </option>
               ))}
             </select>
@@ -439,7 +449,7 @@ export function SettingsModal({ onClose, onChanged }: Props) {
             >
               {CARD_SIZES.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.label}
+                  {t(s.labelKey)}
                 </option>
               ))}
             </select>
@@ -447,13 +457,13 @@ export function SettingsModal({ onClose, onChanged }: Props) {
         </section>
 
         <section>
-          <h3>Логи</h3>
+          <h3>{t("logs_section_title")}</h3>
           <p className="hint">
-            Приложение пишет подробный лог (загрузки, ошибки сети, действия) в файл
-            <code> beamng.log</code> в каталоге данных приложения.
+            {t("logs_hint")}
+            <code> beamng.log</code>
           </p>
           <button className="btn" onClick={openLogs}>
-            Открыть папку логов
+            {t("logs_open_folder")}
           </button>
         </section>
 

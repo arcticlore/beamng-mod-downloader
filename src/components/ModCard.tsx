@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useSources } from "../SourcesContext";
 import { installModeLabel, trustLabel } from "../sources";
+import { useI18n } from "../i18n/LanguageContext";
 import type { DownloadState, ModItem } from "../types";
 import { formatBytes, formatSpeed } from "../types";
 import { ProgressBar } from "./ProgressBar";
@@ -22,6 +23,7 @@ function installedTail(dl: DownloadState | undefined) {
 
 export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Props) {
   const { labelOf, descriptorOf } = useSources();
+  const { t, lang } = useI18n();
   const active = installedTail(dl);
   const descriptor = descriptorOf(item.source);
   const installMode = descriptor?.installMode ?? "mods_zip";
@@ -33,15 +35,17 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
     if (item.author) parts.push(item.author);
     if (item.downloads) parts.push(`↓ ${item.downloads}`);
     if (item.category) parts.push(item.category);
-    if (item.sizeBytes) parts.push(formatBytes(item.sizeBytes));
+    if (item.sizeBytes) parts.push(formatBytes(item.sizeBytes, lang));
     return parts.join(" · ");
-  }, [item]);
+  }, [item, lang]);
 
   const warning = similar
-    ? `Похожий мод уже установлен: ${similar.filename}`
+    ? t("modcard_similar_warning", { file: similar.filename })
     : installed
-      ? "Уже в папке модов"
+      ? t("modcard_installed")
       : undefined;
+
+  const trustKey = descriptor ? trustLabel(descriptor.trustLevel) : null;
 
   return (
     <div className={`mod-card ${installed ? "mod-card-installed" : ""}`}>
@@ -60,12 +64,12 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
           <h3 className="mod-name" title={item.name}>
             {item.name}
           </h3>
-          {descriptor && (
+          {trustKey && (
             <span
-              className={`trust-badge trust-${descriptor.trustLevel}`}
-              title={`Доверие: ${trustLabel(descriptor.trustLevel)}`}
+              className={`trust-badge trust-${descriptor!.trustLevel}`}
+              title={t("trust_badge_title", { level: t(trustKey) })}
             >
-              {trustLabel(descriptor.trustLevel)}
+              {t(trustKey)}
             </span>
           )}
         </div>
@@ -83,10 +87,10 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
               total={active.total}
             />
             <div className="mod-dl-label">
-              {formatBytes(active.received)}
-              {active.total ? ` / ${formatBytes(active.total)}` : ""}
+              {formatBytes(active.received, lang)}
+              {active.total ? ` / ${formatBytes(active.total, lang)}` : ""}
               {" · "}
-              {formatSpeed(active.speedBps)}
+              {formatSpeed(active.speedBps, lang)}
             </div>
           </div>
         ) : (
@@ -94,9 +98,9 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
             <button
               className="btn"
               onClick={() => onInfo(item)}
-              title="Подробнее"
+              title={t("modcard_details")}
             >
-              Подробнее
+              {t("modcard_details")}
             </button>
             <button
               className="btn btn-primary"
@@ -104,25 +108,25 @@ export function ModCard({ item, installed, similar, dl, onInstall, onInfo }: Pro
               onClick={() => onInstall(item)}
               title={
                 !autoInstall
-                  ? installModeLabel(installMode)
+                  ? t(installModeLabel(installMode))
                   : installed
-                    ? "Уже в папке модов"
+                    ? t("modcard_installed")
                     : active?.state === "error"
-                      ? active.error ?? "Ошибка загрузки"
+                      ? (active.error ?? t("modcard_error_title"))
                       : similar
-                        ? "Похожий мод уже установлен — установка запросит подтверждение"
-                        : "Скачать и установить"
+                        ? t("modcard_similar_install_title")
+                        : t("modcard_install_title")
               }
             >
               {!autoInstall
-                ? "Установка вручную"
+                ? t("modcard_manual_install")
                 : installed
-                  ? "✓ Установлено"
+                  ? t("modcard_installed_btn")
                   : active
-                    ? "Ошибка"
+                    ? t("modcard_error_btn")
                     : similar
-                      ? "Есть похожий"
-                      : "Установить"}
+                      ? t("modcard_similar_btn")
+                      : t("modcard_install_btn")}
             </button>
           </div>
         )}

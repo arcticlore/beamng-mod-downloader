@@ -20,10 +20,18 @@ pub struct LedgerEntry {
 
 pub fn ledger_path() -> Result<PathBuf> {
     let dir = dirs::config_dir()
-        .context("не удалось определить каталог конфигурации пользователя")?
+        .context(crate::i18n::t(
+            "не удалось определить каталог конфигурации пользователя",
+            "failed to determine the user config directory",
+        ))?
         .join("beamng-mod-downloader");
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("не удалось создать {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| {
+        crate::i18n::tf(
+            "не удалось создать {0}",
+            "failed to create {0}",
+            &[&dir.display().to_string()],
+        )
+    })?;
     Ok(dir.join("installed-ledger.json"))
 }
 
@@ -46,7 +54,13 @@ pub fn save(entries: &HashMap<String, LedgerEntry>) -> Result<()> {
     let mut list: Vec<&LedgerEntry> = entries.values().collect();
     list.sort_by(|a, b| a.filename.cmp(&b.filename));
     let raw = serde_json::to_string_pretty(&list)?;
-    std::fs::write(&path, raw).with_context(|| format!("не удалось записать {}", path.display()))
+    std::fs::write(&path, raw).with_context(|| {
+        crate::i18n::tf(
+            "не удалось записать {0}",
+            "failed to write {0}",
+            &[&path.display().to_string()],
+        )
+    })
 }
 
 pub fn upsert(entry: LedgerEntry) {

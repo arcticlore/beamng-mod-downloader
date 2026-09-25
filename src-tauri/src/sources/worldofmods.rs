@@ -19,11 +19,11 @@ pub fn categories() -> Vec<SourceCategory> {
         .iter()
         .map(|(id, label)| {
             let label = match *label {
-                "mods" => "Все моды".to_string(),
-                "cars" => "Авто".to_string(),
-                "maps" => "Карты".to_string(),
-                "bikes" => "Мото".to_string(),
-                "planes" => "Авиа".to_string(),
+                "mods" => crate::i18n::t("Все моды", "All mods"),
+                "cars" => crate::i18n::t("Авто", "Vehicles"),
+                "maps" => crate::i18n::t("Карты", "Maps"),
+                "bikes" => crate::i18n::t("Мото", "Bikes"),
+                "planes" => crate::i18n::t("Авиа", "Aircraft"),
                 other => other.to_string(),
             };
             SourceCategory {
@@ -285,7 +285,10 @@ pub async fn resolve_download(
         published_from_page(&doc)
     };
     let manual_href = manual_download_href(&html).ok_or_else(|| {
-        SourceError::Parse("не найдена ссылка на скачивание с WorldOfMods".into())
+        SourceError::Parse(crate::i18n::t(
+            "не найдена ссылка на скачивание с WorldOfMods",
+            "no download link found on WorldOfMods",
+        ))
     })?;
 
     // Запрос, который возвращает актуальный файл
@@ -304,9 +307,10 @@ pub async fn resolve_download(
     let sel = Selector::parse("#download-button").map_err(|e| SourceError::Parse(e.to_string()))?;
     let doc = Html::parse_document(&ajax);
     let Some(final_url) = doc.select(&sel).next().and_then(|a| a.value().attr("href")) else {
-        return Err(SourceError::Parse(
-            "WorldOfMods не отдал прямую ссылку (возможно, нужен аккаунт)".into(),
-        ));
+        return Err(SourceError::Parse(crate::i18n::t(
+            "WorldOfMods не отдал прямую ссылку (возможно, нужен аккаунт)",
+            "WorldOfMods did not return a direct link (an account may be required)",
+        )));
     };
 
     let final_url = if final_url.starts_with("//") {

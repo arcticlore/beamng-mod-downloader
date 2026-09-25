@@ -29,10 +29,10 @@ pub fn categories() -> Vec<SourceCategory> {
         .map(|(id, _)| SourceCategory {
             id: id.to_string(),
             label: match *id {
-                "all" => "Все".to_string(),
-                "maps" => "Карты".to_string(),
-                "vehicles" => "Авто".to_string(),
-                "other" => "Другое".to_string(),
+                "all" => crate::i18n::t("Все", "All"),
+                "maps" => crate::i18n::t("Карты", "Maps"),
+                "vehicles" => crate::i18n::t("Авто", "Vehicles"),
+                "other" => crate::i18n::t("Другое", "Other"),
                 other => other.to_string(),
             },
         })
@@ -59,12 +59,18 @@ fn map_err(e: reqwest::Error, url: &str) -> SourceError {
         if status == reqwest::StatusCode::FORBIDDEN
             || status == reqwest::StatusCode::TOO_MANY_REQUESTS
         {
-            return SourceError::Unavailable(format!(
-                "Codeberg ограничил частоту запросов. URL: {url}"
+            return SourceError::Unavailable(crate::i18n::tf(
+                "Codeberg ограничил частоту запросов. URL: {0}",
+                "Codeberg rate-limited the request. URL: {0}",
+                &[url],
             ));
         }
         if status == reqwest::StatusCode::NOT_FOUND {
-            return SourceError::Parse(format!("не найдено на Codeberg: {url}"));
+            return SourceError::Parse(crate::i18n::tf(
+                "не найдено на Codeberg: {0}",
+                "not found on Codeberg: {0}",
+                &[url],
+            ));
         }
     }
     SourceError::Network(e.to_string())
@@ -206,8 +212,13 @@ pub async fn search(
         ),
     };
     let body = fetch(client, &url).await?;
-    let resp: SearchBody = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("Codeberg ответил не JSON: {e}")))?;
+    let resp: SearchBody = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "Codeberg ответил не JSON: {0}",
+            "Codeberg did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
 
     let mut items = Vec::with_capacity(resp.data.len().min(ENRICH_LIMIT));
     for r in resp.data.iter().take(ENRICH_LIMIT) {
@@ -235,13 +246,25 @@ async fn latest_release(
     let url =
         format!("{API}/repos/{full_name}/releases?limit=1&draft=false&prerelease=false&page=1");
     let body = fetch(client, &url).await?;
-    let raw: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("Codeberg ответил не JSON: {e}")))?;
-    let releases = raw
-        .as_array()
-        .ok_or_else(|| SourceError::Parse("тело releases не массив".to_string()))?;
+    let raw: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "Codeberg ответил не JSON: {0}",
+            "Codeberg did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
+    let releases = raw.as_array().ok_or_else(|| {
+        SourceError::Parse(crate::i18n::t(
+            "тело releases не массив",
+            "releases body is not an array",
+        ))
+    })?;
     let asset = pick_zip_asset(releases).ok_or_else(|| {
-        SourceError::Unavailable(format!("у {full_name} нет zip-ассета в последнем релизе"))
+        SourceError::Unavailable(crate::i18n::tf(
+            "у {0} нет zip-ассета в последнем релизе",
+            "no zip asset in the latest release of {0}",
+            &[full_name],
+        ))
     })?;
     cache_release(full_name, asset.clone());
     Ok(asset)
@@ -263,15 +286,19 @@ fn cache_release(full_name: &str, asset: ReleaseAsset) {
 fn repo_from_key(key: &str) -> Result<String, SourceError> {
     let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() < 4 || parts[1] != "codeberg.org" {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку Codeberg: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку Codeberg: {0}",
+            "does not look like a Codeberg link: {0}",
+            &[key],
         )));
     }
     let owner = parts[2];
     let repo = parts[3];
     if owner.is_empty() || repo.is_empty() {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку Codeberg: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку Codeberg: {0}",
+            "does not look like a Codeberg link: {0}",
+            &[key],
         )));
     }
     Ok(format!("{owner}/{repo}"))
@@ -285,8 +312,13 @@ pub async fn detail(
     let full = repo_from_key(key)?;
     let url = format!("{API}/repos/{full}");
     let body = fetch(client, &url).await?;
-    let r: Repo = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("Codeberg ответил не JSON: {e}")))?;
+    let r: Repo = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "Codeberg ответил не JSON: {0}",
+            "Codeberg did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
     let full_description = r.description.clone();
     let item = item(&r);
     Ok(ModDetail {

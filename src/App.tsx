@@ -10,6 +10,8 @@ import {
 } from "./api";
 import { applyAppearance } from "./theme";
 import { SourcesProvider, useSources } from "./SourcesContext";
+import { LanguageProvider } from "./i18n/LanguageContext";
+import { normalizeLang, t as tr } from "./i18n";
 import { DetailModal } from "./components/DetailModal";
 import { DownloadsPanel } from "./components/DownloadsPanel";
 import { InstalledPanel } from "./components/InstalledPanel";
@@ -25,10 +27,10 @@ import {
 
 type View = "browse" | "downloads" | "installed";
 
-const NAV: { id: View; label: string }[] = [
-  { id: "browse", label: "Поиск модов" },
-  { id: "downloads", label: "Загрузки" },
-  { id: "installed", label: "Установленные" },
+const NAV: { id: View; labelKey: "nav_browse" | "nav_downloads" | "nav_installed" }[] = [
+  { id: "browse", labelKey: "nav_browse" },
+  { id: "downloads", labelKey: "nav_downloads" },
+  { id: "installed", labelKey: "nav_installed" },
 ];
 
 function AppInner() {
@@ -41,6 +43,17 @@ function AppInner() {
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
   const [toast, setToast] = useState<string | null>(null);
+
+  const lang = useMemo(() => normalizeLang(settings?.language), [settings]);
+  const t = useCallback(
+    (key: Parameters<typeof tr>[1], params?: Record<string, string | number>) =>
+      tr(lang, key, params),
+    [lang],
+  );
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   useEffect(() => {
     applyAppearance(settings);
@@ -72,17 +85,24 @@ function AppInner() {
     const un2 = listen<DownloadState>("download::finished", (e) => {
       setDownloads((prev) => ({ ...prev, [e.payload.key]: e.payload }));
       if (e.payload.state === "done") {
-        showToast(`Мод «${e.payload.name}» установлен: ${e.payload.filename}`);
+        showToast(
+          t("toast_mod_installed", {
+            name: e.payload.name,
+            filename: e.payload.filename,
+          }),
+        );
         refreshInstalled();
       } else if (e.payload.state === "error") {
-        showToast(`Ошибка: ${e.payload.error ?? "неизвестно"}`);
+        showToast(
+          t("toast_error", { err: e.payload.error ?? t("toast_error_unknown") }),
+        );
       }
     });
     return () => {
       un1.then((f) => f());
       un2.then((f) => f());
     };
-  }, [refreshInstalled, showToast]);
+  }, [refreshInstalled, showToast, t]);
 
   const setDownloadsBySnapshot = async () => {
     try {
@@ -122,7 +142,10 @@ function AppInner() {
       const similar = findSimilarInstalled(item, installedList);
       if (similar && !installedNames.has(name)) {
         const ok = window.confirm(
-          `Похоже, мод «${item.name}» уже установлен как файл «${similar.filename}». Скачать его ещё раз (возможно, это обновление или одноимённый мод)?`,
+          t("confirm_similar_install", {
+            name: item.name,
+            file: similar.filename,
+          }),
         );
         if (!ok) return;
       }
@@ -152,103 +175,105 @@ function AppInner() {
         showToast(String(e));
       }
     },
-    [showToast, installedList, installedNames, filenameFor],
+    [showToast, installedList, installedNames, filenameFor, t],
   );
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="app-title">
-          <span className="app-logo">🚗</span>
-          <h1>BeamNG Mod Downloader</h1>
-        </div>
-        <div className="header-right">
-          <span
-            className={`folder-indicator ${modsFolder ? "" : "folder-none"}`}
-            title={modsFolder ?? "Папка модов не выбрана"}
-            onClick={() => setSettingsOpen(true)}
-          >
-            {modsFolder ? "📁 " + modsFolder : "📁 выбрать папку модов"}
-          </span>
-          <button className="btn btn-sm" onClick={() => setSettingsOpen(true)}>
-            Настройки
-          </button>
-        </div>
-      </header>
+    <LanguageProvider lang={lang}>
+      <div className="app">
+        <header className="app-header">
+          <div className="app-title">
+            <span className="app-logo">🚗</span>
+            <h1>BeamNG Mod Downloader</h1>
+          </div>
+          <div className="header-right">
+            <span
+              className={`folder-indicator ${modsFolder ? "" : "folder-none"}`}
+              title={modsFolder ?? t("folder_title_none")}
+              onClick={() => setSettingsOpen(true)}
+            >
+              {modsFolder ? "📁 " + modsFolder : t("folder_choose")}
+            </span>
+            <button className="btn btn-sm" onClick={() => setSettingsOpen(true)}>
+              {t("settings")}
+            </button>
+          </div>
+        </header>
 
-      <nav className="tabs">
-        {NAV.map((t) => (
-          <button
-            key={t.id}
-            className={`tab ${view === t.id ? "tab-active" : ""}`}
-            onClick={() => setView(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+        <nav className="tabs">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              className={`tab ${view === n.id ? "tab-active" : ""}`}
+              onClick={() => setView(n.id)}
+            >
+              {t(n.labelKey)}
+            </button>
+          ))}
+        </nav>
 
-      <main className="app-main">
-        {view === "downloads" ? (
-          <DownloadsPanel
-            downloads={downloads}
-            onClearFinished={() =>
-              setDownloads((prev) => {
-                const next: Record<string, DownloadState> = {};
-                for (const d of Object.values(prev)) {
-                  if (d.state === "downloading") next[d.key] = d;
-                }
-                return next;
-              })
-            }
-            onCancel={onCancel}
-          />
-        ) : view === "installed" ? (
-          <InstalledPanel
-            settings={settings}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-        ) : (
-          <ModsBrowser
-            downloads={downloads}
-            installedNames={installedNames}
-            installedList={installedList}
-            cardSize={settings?.cardSize ?? "normal"}
-            onInstall={onInstall}
-            onInfo={setDetailItem}
-            onOpenSettings={() => setSettingsOpen(true)}
+        <main className="app-main">
+          {view === "downloads" ? (
+            <DownloadsPanel
+              downloads={downloads}
+              onClearFinished={() =>
+                setDownloads((prev) => {
+                  const next: Record<string, DownloadState> = {};
+                  for (const d of Object.values(prev)) {
+                    if (d.state === "downloading") next[d.key] = d;
+                  }
+                  return next;
+                })
+              }
+              onCancel={onCancel}
+            />
+          ) : view === "installed" ? (
+            <InstalledPanel
+              settings={settings}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          ) : (
+            <ModsBrowser
+              downloads={downloads}
+              installedNames={installedNames}
+              installedList={installedList}
+              cardSize={settings?.cardSize ?? "normal"}
+              onInstall={onInstall}
+              onInfo={setDetailItem}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          )}
+        </main>
+
+        {settingsOpen && (
+          <SettingsModal
+            onClose={() => setSettingsOpen(false)}
+            onChanged={() => {
+              getModsFolder().then(setModsFolder).catch(() => {});
+              getSettings().then(setSettingsState).catch(() => {});
+              refreshInstalled();
+            }}
           />
         )}
-      </main>
 
-      {settingsOpen && (
-        <SettingsModal
-          onClose={() => setSettingsOpen(false)}
-          onChanged={() => {
-            getModsFolder().then(setModsFolder).catch(() => {});
-            getSettings().then(setSettingsState).catch(() => {});
-            refreshInstalled();
-          }}
-        />
-      )}
+        {detailItem && (
+          <DetailModal
+            item={detailItem}
+            dl={downloads[detailItem.id]}
+            installed={installedNames.has(filenameFor(detailItem))}
+            similar={
+              installedNames.has(filenameFor(detailItem))
+                ? null
+                : findSimilarInstalled(detailItem, installedList)
+            }
+            onInstall={onInstall}
+            onClose={() => setDetailItem(null)}
+          />
+        )}
 
-      {detailItem && (
-        <DetailModal
-          item={detailItem}
-          dl={downloads[detailItem.id]}
-          installed={installedNames.has(filenameFor(detailItem))}
-          similar={
-            installedNames.has(filenameFor(detailItem))
-              ? null
-              : findSimilarInstalled(detailItem, installedList)
-          }
-          onInstall={onInstall}
-          onClose={() => setDetailItem(null)}
-        />
-      )}
-
-      {toast && <div className="toast">{toast}</div>}
-    </div>
+        {toast && <div className="toast">{toast}</div>}
+      </div>
+    </LanguageProvider>
   );
 }
 

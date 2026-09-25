@@ -117,7 +117,7 @@ pub struct SourceCategory {
     pub label: String,
 }
 
-/// Пользовательские настройки интерфейса (тема, акцент, панель модов).
+/// Пользовательские настройки интерфейса (тема, акцент, панель модов, язык).
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -131,6 +131,8 @@ pub struct AppSettings {
     pub installed_collapsed: Option<bool>,
     /// Размер карточек в браузере: "compact" | "normal" | "large".
     pub card_size: Option<String>,
+    /// Язык интерфейса: "ru" | "en".
+    pub language: Option<String>,
 }
 
 // --- Единый registry источников (single source of truth для UI) ---

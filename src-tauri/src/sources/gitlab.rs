@@ -43,10 +43,10 @@ pub fn categories() -> Vec<SourceCategory> {
         .map(|(id, _)| SourceCategory {
             id: id.to_string(),
             label: match *id {
-                "all" => "Все".to_string(),
-                "maps" => "Карты".to_string(),
-                "vehicles" => "Авто".to_string(),
-                "other" => "Другое".to_string(),
+                "all" => crate::i18n::t("Все", "All"),
+                "maps" => crate::i18n::t("Карты", "Maps"),
+                "vehicles" => crate::i18n::t("Авто", "Vehicles"),
+                "other" => crate::i18n::t("Другое", "Other"),
                 other => other.to_string(),
             },
         })
@@ -84,12 +84,18 @@ async fn fetch_with_headers(
 fn map_err(e: reqwest::Error, url: &str) -> SourceError {
     if let Some(status) = e.status() {
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            return SourceError::Unavailable(format!(
-                "GitLab ограничил частоту запросов. URL: {url}"
+            return SourceError::Unavailable(crate::i18n::tf(
+                "GitLab ограничил частоту запросов. URL: {0}",
+                "GitLab rate-limited the request. URL: {0}",
+                &[url],
             ));
         }
         if status == reqwest::StatusCode::NOT_FOUND {
-            return SourceError::Parse(format!("не найдено на GitLab: {url}"));
+            return SourceError::Parse(crate::i18n::tf(
+                "не найдено на GitLab: {0}",
+                "not found on GitLab: {0}",
+                &[url],
+            ));
         }
     }
     SourceError::Network(e.to_string())
@@ -251,8 +257,13 @@ pub async fn search(
         ),
     };
     let (body, next) = fetch_with_headers(client, &url).await?;
-    let projects: Vec<Project> = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitLab ответил не JSON: {e}")))?;
+    let projects: Vec<Project> = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "GitLab ответил не JSON: {0}",
+            "GitLab did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
 
     let mut items = Vec::with_capacity(projects.len().min(ENRICH_LIMIT));
     for p in projects.iter().take(ENRICH_LIMIT) {
@@ -286,13 +297,25 @@ async fn latest_release(client: &reqwest::Client, path: &str) -> Result<ReleaseA
         encode_path(path)
     );
     let (body, _) = fetch_with_headers(client, &url).await?;
-    let raw: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitLab ответил не JSON: {e}")))?;
-    let releases = raw
-        .as_array()
-        .ok_or_else(|| SourceError::Parse("тело releases не массив".to_string()))?;
+    let raw: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "GitLab ответил не JSON: {0}",
+            "GitLab did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
+    let releases = raw.as_array().ok_or_else(|| {
+        SourceError::Parse(crate::i18n::t(
+            "тело releases не массив",
+            "releases body is not an array",
+        ))
+    })?;
     let asset = pick_zip_asset(releases).ok_or_else(|| {
-        SourceError::Unavailable(format!("у {path} нет zip-ассета в последнем релизе"))
+        SourceError::Unavailable(crate::i18n::tf(
+            "у {0} нет zip-ассета в последнем релизе",
+            "no zip asset in the latest release of {0}",
+            &[path],
+        ))
     })?;
     cache_release(path, asset.clone());
     Ok(asset)
@@ -314,15 +337,19 @@ fn cache_release(path: &str, asset: ReleaseAsset) {
 fn repo_from_key(key: &str) -> Result<String, SourceError> {
     let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() < 4 || parts[1] != "gitlab.com" {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку GitLab: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку GitLab: {0}",
+            "does not look like a GitLab link: {0}",
+            &[key],
         )));
     }
     let owner = parts[2];
     let repo = parts[3];
     if owner.is_empty() || repo.is_empty() {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку GitLab: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку GitLab: {0}",
+            "does not look like a GitLab link: {0}",
+            &[key],
         )));
     }
     Ok(format!("{owner}/{repo}"))
@@ -336,8 +363,13 @@ pub async fn detail(
     let path = repo_from_key(key)?;
     let url = format!("{API}/projects/{}", encode_path(&path));
     let (body, _) = fetch_with_headers(client, &url).await?;
-    let p: Project = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitLab ответил не JSON: {e}")))?;
+    let p: Project = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "GitLab ответил не JSON: {0}",
+            "GitLab did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
     let full_description = p.description.clone();
     let item = item(&p);
     Ok(ModDetail {

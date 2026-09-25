@@ -8,28 +8,34 @@ import {
   groupLabel,
   searchCapableEnabledIds,
   toggleSourceSelection,
+  trustLabel,
 } from "../sources";
+import { useI18n } from "../i18n/LanguageContext";
 import type { SourceGroup, SourceDescriptor } from "../types";
 
 type Preset = "recommended" | "official_forges" | "all_configured" | "clear";
 
-const PRESETS: { id: Preset; label: string; title: string }[] = [
+const PRESETS: {
+  id: Preset;
+  labelKey: "preset_recommended" | "preset_official_forges" | "preset_all_configured" | "preset_clear";
+  titleKey: "preset_recommended_title" | "preset_official_forges_title" | "preset_all_title" | "picker_preset_clear_title";
+}[] = [
   {
     id: "recommended",
-    label: "Рекомендуемые",
-    title: "Официальный сайт BeamNG и open-source forges",
+    labelKey: "preset_recommended",
+    titleKey: "preset_recommended_title",
   },
   {
     id: "official_forges",
-    label: "Официальные + forges",
-    title: "Официальные и open-source forges",
+    labelKey: "preset_official_forges",
+    titleKey: "preset_official_forges_title",
   },
   {
     id: "all_configured",
-    label: "Все включённые",
-    title: "Все включённые источники с поддержкой поиска",
+    labelKey: "preset_all_configured",
+    titleKey: "preset_all_title",
   },
-  { id: "clear", label: "Снять выбор", title: "Ничего не искать" },
+  { id: "clear", labelKey: "preset_clear", titleKey: "picker_preset_clear_title" },
 ];
 
 const GROUPS: SourceGroup[] = ["official", "forges", "community", "custom"];
@@ -42,6 +48,7 @@ interface Props {
 
 export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
   const { registry, selection, setSelected } = useSources();
+  const { t } = useI18n();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -137,15 +144,15 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
         ref={panelRef}
         className="source-picker-panel"
         role="dialog"
-        aria-label="Выбор источников поиска"
+        aria-label={t("picker_aria_label")}
       >
         <div className="source-picker-head">
-          <span className="source-picker-title">Источники поиска</span>
+          <span className="source-picker-title">{t("picker_title")}</span>
           <button
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Закрыть"
+            aria-label={t("picker_close_aria")}
           >
             ✕
           </button>
@@ -154,10 +161,10 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
           ref={inputRef}
           className="search-input source-picker-filter"
           type="search"
-          placeholder="Фильтр по названию или id…"
+          placeholder={t("picker_filter_placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          aria-label="Фильтр источников"
+          aria-label={t("picker_filter_aria")}
           disabled={busy}
         />
         <div className="source-presets">
@@ -166,24 +173,24 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
               key={p.id}
               type="button"
               className="btn btn-sm"
-              title={p.title}
+              title={t(p.titleKey)}
               disabled={busy || (!anySearchCapable && p.id !== "clear")}
               onClick={() => void apply(p.id)}
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
 
         {disabledCount > 0 && (
           <div className="hint source-picker-hint">
-            Отключённые и источники без поиска не участвуют в поиске.
+            {t("picker_hint_disabled")}
           </div>
         )}
 
-        {!selection && <div className="hint">Загрузка источников…</div>}
+        {!selection && <div className="hint">{t("picker_loading")}</div>}
         {selection && filtered.length === 0 && (
-          <div className="hint">Ничего не найдено</div>
+          <div className="hint">{t("picker_empty")}</div>
         )}
 
         {selection &&
@@ -191,11 +198,12 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
             (g) =>
               groups.has(g) && (
                 <div key={g} className="source-group">
-                  <div className="source-group-label">{groupLabel(g)}</div>
+                  <div className="source-group-label">{t(groupLabel(g))}</div>
                   {groups.get(g)!.map((d) => {
                     const isEnabled = enabled.includes(d.id);
                     const isSearchable = d.capabilities.search;
                     const isSelected = selectedSet.has(d.id);
+                    const trustKey = trustLabel(d.trustLevel);
                     return (
                       <div
                         key={d.id}
@@ -205,17 +213,9 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
                           <span className="source-item-name">{d.label}</span>
                           <span
                             className={`trust-badge trust-${d.trustLevel}`}
-                            title={`Доверие: ${d.trustLevel}`}
+                            title={t("trust_badge_title", { level: t(trustKey) })}
                           >
-                            {d.trustLevel === "official"
-                              ? "Официальный"
-                              : d.trustLevel === "verified_forge"
-                                ? "Open-source forge"
-                                : d.trustLevel === "community"
-                                  ? "Community"
-                                  : d.trustLevel === "third_party"
-                                    ? "Сторонний"
-                                    : "Пользовательский"}
+                            {t(trustKey)}
                           </span>
                         </div>
                         <div className="source-item-controls">
@@ -229,13 +229,13 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
                                 onChange={() => void toggle(d.id)}
                               />
                               <span className="switch-box" />
-                              <span>Поиск</span>
+                              <span>{t("picker_search")}</span>
                             </label>
                           ) : (
                             <span className="source-picker-why">
                               {!isEnabled
-                                ? "Выключен"
-                                : "Только вручную"}
+                                ? t("picker_off")
+                                : t("picker_manual_only")}
                             </span>
                           )}
                         </div>
@@ -258,7 +258,7 @@ export function SourcePicker({ open, onClose, onOpenSettings }: Props) {
               onOpenSettings();
             }}
           >
-            Настроить источники…
+            {t("picker_configure")}
           </button>
         </div>
       </div>

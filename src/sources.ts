@@ -7,6 +7,7 @@ import type {
   SourceStatus,
   TrustLevel,
 } from "./types";
+import type { MessageKey } from "./i18n";
 import { sanitizeFileName } from "./types.ts";
 
 export type SourcePreset =
@@ -30,57 +31,57 @@ export const TRUST_ORDER: Record<TrustLevel, number> = {
   custom: 4,
 };
 
-export function groupLabel(g: SourceGroup): string {
+export function groupLabel(g: SourceGroup): MessageKey {
   switch (g) {
     case "official":
-      return "Официальные";
+      return "group_official";
     case "forges":
-      return "Open-source forges";
+      return "group_forges";
     case "community":
-      return "Community";
+      return "group_community";
     case "custom":
-      return "Пользовательские";
+      return "group_custom";
   }
 }
 
-export function trustLabel(t: TrustLevel): string {
+export function trustLabel(t: TrustLevel): MessageKey {
   switch (t) {
     case "official":
-      return "Официальный";
+      return "trust_official";
     case "verified_forge":
-      return "Open-source forge";
+      return "trust_verified_forge";
     case "community":
-      return "Community";
+      return "trust_community";
     case "third_party":
-      return "Сторонний / не проверен";
+      return "trust_third_party";
     case "custom":
-      return "Пользовательский / не проверен";
+      return "trust_custom";
   }
 }
 
-export function statusLabel(s: SourceStatus): string {
+export function statusLabel(s: SourceStatus): MessageKey {
   switch (s) {
     case "ready":
-      return "готов";
+      return "status_ready";
     case "needs_api_key":
-      return "требуется API key";
+      return "status_needs_api_key";
     case "not_configured":
-      return "не настроен";
+      return "status_not_configured";
     case "unavailable":
-      return "недоступен";
+      return "status_unavailable";
     case "rate_limited":
-      return "rate limited";
+      return "status_rate_limited";
   }
 }
 
-export function installModeLabel(m: InstallMode): string {
+export function installModeLabel(m: InstallMode): MessageKey {
   switch (m) {
     case "mods_zip":
-      return "Автоустановка ZIP";
+      return "installmode_autozip";
     case "manual_external":
-      return "Только вручную (внешняя страница)";
+      return "installmode_manual";
     case "unsupported":
-      return "Не поддерживается";
+      return "installmode_unsupported";
   }
 }
 

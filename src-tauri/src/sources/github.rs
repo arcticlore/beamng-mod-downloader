@@ -31,10 +31,10 @@ pub fn categories() -> Vec<SourceCategory> {
         .map(|(id, _)| SourceCategory {
             id: id.to_string(),
             label: match *id {
-                "all" => "Все".to_string(),
-                "maps" => "Карты".to_string(),
-                "vehicles" => "Авто".to_string(),
-                "other" => "Другое".to_string(),
+                "all" => crate::i18n::t("Все", "All"),
+                "maps" => crate::i18n::t("Карты", "Maps"),
+                "vehicles" => crate::i18n::t("Авто", "Vehicles"),
+                "other" => crate::i18n::t("Другое", "Other"),
                 other => other.to_string(),
             },
         })
@@ -96,12 +96,18 @@ async fn gh_get(client: &reqwest::Client, url: &str) -> Result<String, SourceErr
 fn map_gh_error(e: reqwest::Error, url: &str) -> SourceError {
     if let Some(status) = e.status() {
         if status == reqwest::StatusCode::FORBIDDEN {
-            return SourceError::Network(format!(
-                "GitHub ограничил запросы (rate limit). URL: {url}"
+            return SourceError::Network(crate::i18n::tf(
+                "GitHub ограничил запросы (rate limit). URL: {0}",
+                "GitHub rate-limited the request. URL: {0}",
+                &[url],
             ));
         }
         if status == reqwest::StatusCode::NOT_FOUND {
-            return SourceError::Parse(format!("не найдено на GitHub: {url}"));
+            return SourceError::Parse(crate::i18n::tf(
+                "не найдено на GitHub: {0}",
+                "not found on GitHub: {0}",
+                &[url],
+            ));
         }
     }
     SourceError::Network(e.to_string())
@@ -169,8 +175,13 @@ pub async fn search(
         page.max(1)
     );
     let body = gh_get(client, &url).await?;
-    let resp: SearchResponse = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitHub ответил не JSON: {e}")))?;
+    let resp: SearchResponse = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "GitHub ответил не JSON: {0}",
+            "GitHub did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
 
     // GitHub отдаёт максимум 1000 результатов поиска
     let cap = resp.total_count.min(1000);
@@ -192,12 +203,19 @@ pub async fn detail(
     let full = repo_from_key(key)?;
     let url = format!("{API}/search/repositories?q=repo:{full}&per_page=1");
     let body = gh_get(client, &url).await?;
-    let resp: SearchResponse = serde_json::from_str(&body)
-        .map_err(|e| SourceError::Parse(format!("GitHub ответил не JSON: {e}")))?;
-    let it = resp
-        .items
-        .first()
-        .ok_or_else(|| SourceError::Parse("репозиторий не найден".into()))?;
+    let resp: SearchResponse = serde_json::from_str(&body).map_err(|e| {
+        SourceError::Parse(crate::i18n::tf(
+            "GitHub ответил не JSON: {0}",
+            "GitHub did not respond with JSON: {0}",
+            &[&e.to_string()],
+        ))
+    })?;
+    let it = resp.items.first().ok_or_else(|| {
+        SourceError::Parse(crate::i18n::t(
+            "репозиторий не найден",
+            "repository not found",
+        ))
+    })?;
     let item = item(it);
     let full_description = item.description.clone();
     let screenshots: Vec<String> = Vec::new();
@@ -213,15 +231,19 @@ pub async fn detail(
 pub(crate) fn repo_from_key(key: &str) -> Result<String, SourceError> {
     let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() < 4 || parts[1] != "github.com" {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку GitHub: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку GitHub: {0}",
+            "does not look like a GitHub link: {0}",
+            &[key],
         )));
     }
     let owner = parts[2];
     let repo = parts[3];
     if owner.is_empty() || repo.is_empty() {
-        return Err(SourceError::Parse(format!(
-            "не похоже на ссылку GitHub: {key}"
+        return Err(SourceError::Parse(crate::i18n::tf(
+            "не похоже на ссылку GitHub: {0}",
+            "does not look like a GitHub link: {0}",
+            &[key],
         )));
     }
     Ok(format!("{owner}/{repo}"))
@@ -312,7 +334,13 @@ pub async fn resolve_download(
     let latest_url = format!("{base}/releases/latest");
     let latest = http::fetch_string(client, &latest_url, None)
         .await
-        .map_err(|e| SourceError::Unavailable(format!("нет релизов у {full}: {e}")))?;
+        .map_err(|e| {
+            SourceError::Unavailable(crate::i18n::tf(
+                "нет релизов у {0}: {1}",
+                "no releases for {0}: {1}",
+                &[&full, &e.to_string()],
+            ))
+        })?;
 
     let mut url = pick_asset(&latest);
     if url.is_none() {
@@ -326,8 +354,10 @@ pub async fn resolve_download(
     }
 
     let url = url.ok_or_else(|| {
-        SourceError::Unavailable(format!(
-            "в последнем релизе {full} нет файлов для скачивания"
+        SourceError::Unavailable(crate::i18n::tf(
+            "в последнем релизе {0} нет файлов для скачивания",
+            "the latest release of {0} has no downloadable files",
+            &[&full],
         ))
     })?;
 

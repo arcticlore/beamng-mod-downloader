@@ -3,6 +3,7 @@ mod config;
 mod download;
 mod game;
 mod http;
+mod i18n;
 mod installer;
 mod ledger;
 mod models;
@@ -51,11 +52,17 @@ fn detect_mods_folders() -> Vec<ModsFolderCandidate> {
 fn set_mods_folder(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let dir = PathBuf::from(&path);
     if !dir.is_dir() {
-        return Err(format!("каталог не существует: {path}"));
+        return Err(i18n::tf(
+            "каталог не существует: {0}",
+            "directory does not exist: {0}",
+            &[path],
+        ));
     }
     if !game::is_plausible_mods_folder(&dir) {
-        return Err(format!(
-            "в каталоге {path} нет архивов модов (.zip). Убедитесь, что выбрана папка mods BeamNG.drive"
+        return Err(i18n::tf(
+            "в каталоге {0} нет архивов модов (.zip). Убедитесь, что выбрана папка mods BeamNG.drive",
+            "no mod archives (.zip) in {0}. Make sure the mods folder of BeamNG.drive is selected",
+            &[&path],
         ));
     }
     info!("папка модов задана: {path}");
@@ -68,7 +75,11 @@ fn set_mods_folder(state: State<'_, AppState>, path: String) -> Result<(), Strin
 fn set_mods_folder_force(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let dir = PathBuf::from(&path);
     if !dir.is_dir() {
-        return Err(format!("каталог не существует: {path}"));
+        return Err(i18n::tf(
+            "каталог не существует: {0}",
+            "directory does not exist: {0}",
+            &[path],
+        ));
     }
     let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
     cfg.mods_folder = Some(path);
@@ -80,7 +91,10 @@ fn set_mods_folder_force(state: State<'_, AppState>, path: String) -> Result<(),
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("разрешены только http/https ссылки".to_string());
+        return Err(i18n::t(
+            "разрешены только http/https ссылки",
+            "only http/https links are allowed",
+        ));
     }
     #[cfg(target_os = "linux")]
     let opened = std::process::Command::new("xdg-open")
@@ -106,7 +120,10 @@ fn open_url(url: String) -> Result<(), String> {
         Ok(())
     } else {
         error!("не удалось открыть ссылку: {url}");
-        Err("не удалось открыть браузер".to_string())
+        Err(i18n::t(
+            "не удалось открыть браузер",
+            "could not open the browser",
+        ))
     }
 }
 
@@ -216,7 +233,11 @@ fn set_source_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     if !sources::registry::is_known(&source_id) {
-        return Err(format!("неизвестный источник `{source_id}`"));
+        return Err(i18n::tf(
+            "неизвестный источник `{0}`",
+            "unknown source `{0}`",
+            &[&source_id],
+        ));
     }
     let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
     let mut list = cfg.enabled_sources();
@@ -263,7 +284,11 @@ fn set_source_selected(
     ids.dedup();
     for id in &ids {
         if !sources::registry::is_known(id) {
-            return Err(format!("неизвестный источник `{id}`"));
+            return Err(i18n::tf(
+                "неизвестный источник `{0}`",
+                "unknown source `{0}`",
+                &[id],
+            ));
         }
     }
     let mut cfg = state.config.lock().map_err(|e| e.to_string())?;
@@ -294,11 +319,17 @@ fn require_source_enabled(config: &Config, source: &str) -> Result<(), String> {
     if sources::can_query(&enabled, source) {
         Ok(())
     } else if sources::registry::is_known(source) {
-        Err(format!(
-            "источник «{source}» отключён в настройках — включите его, чтобы искать и устанавливать"
+        Err(i18n::tf(
+            "источник «{0}» отключён в настройках — включите его, чтобы искать и устанавливать",
+            "source \"{0}\" is disabled in settings — enable it to search and install",
+            &[source],
         ))
     } else {
-        Err(format!("неизвестный источник «{source}»"))
+        Err(i18n::tf(
+            "неизвестный источник «{0}»",
+            "unknown source \"{0}\"",
+            &[source],
+        ))
     }
 }
 
@@ -315,9 +346,12 @@ async fn install_mod(
     let mods_folder = {
         let cfg = state.config.lock().map_err(|e| e.to_string())?;
         require_source_enabled(&cfg, &req.source)?;
-        cfg.mods_folder
-            .clone()
-            .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?
+        cfg.mods_folder.clone().ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?
     };
     download::start(
         &app,
@@ -346,14 +380,20 @@ async fn update_mod(
     info!("обновление мода: {filename}");
     let mods_folder = {
         let cfg = state.config.lock().map_err(|e| e.to_string())?;
-        let entry = ledger::load()
-            .get(&filename)
-            .cloned()
-            .ok_or_else(|| format!("мод `{filename}` не был установлен лаунчером"))?;
+        let entry = ledger::load().get(&filename).cloned().ok_or_else(|| {
+            i18n::tf(
+                "мод `{0}` не был установлен лаунчером",
+                "mod `{0}` was not installed by the launcher",
+                &[&filename],
+            )
+        })?;
         require_source_enabled(&cfg, &entry.source)?;
-        cfg.mods_folder
-            .clone()
-            .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?
+        cfg.mods_folder.clone().ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?
     };
     download::update(
         &app,
@@ -377,7 +417,12 @@ async fn verify_installed(state: State<'_, AppState>) -> Result<Vec<IntegrityRep
         .map_err(|e| e.to_string())?
         .mods_folder
         .clone()
-        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+        .ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?;
     let list =
         installer::list_installed(&PathBuf::from(&mods_folder)).map_err(|e| e.to_string())?;
     let ledger = ledger::load();
@@ -409,7 +454,10 @@ async fn verify_installed(state: State<'_, AppState>) -> Result<Vec<IntegrityRep
                 error: if zip_ok {
                     None
                 } else {
-                    Some("архив повреждён или усечён".to_string())
+                    Some(i18n::t(
+                        "архив повреждён или усечён",
+                        "archive is corrupted or truncated",
+                    ))
                 },
             });
         }
@@ -417,7 +465,13 @@ async fn verify_installed(state: State<'_, AppState>) -> Result<Vec<IntegrityRep
         reports
     })
     .await
-    .map_err(|e| format!("проверка целостности прервана: {e}"))
+    .map_err(|e| {
+        i18n::tf(
+            "проверка целостности прервана: {0}",
+            "integrity check aborted: {0}",
+            &[&e.to_string()],
+        )
+    })
 }
 
 #[tauri::command]
@@ -433,7 +487,12 @@ fn list_installed(state: State<'_, AppState>) -> Result<Vec<InstalledMod>, Strin
         .map_err(|e| e.to_string())?
         .mods_folder
         .clone()
-        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+        .ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?;
     let mut items =
         installer::list_installed(&PathBuf::from(mods_folder)).map_err(|e| e.to_string())?;
     let ledger = ledger::load();
@@ -454,7 +513,12 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
         .map_err(|e| e.to_string())?
         .mods_folder
         .clone()
-        .ok_or_else(|| "не выбрана папка с модами BeamNG".to_string())?;
+        .ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?;
 
     // Защита от выхода за пределы папки модов: допускаем только относительные
     // пути без `..`, которые могут прийти из сканирования файловой системы.
@@ -469,7 +533,10 @@ fn remove_installed(state: State<'_, AppState>, path: String) -> Result<(), Stri
             )
         })
     {
-        return Err("недопустимый путь для удаления".to_string());
+        return Err(i18n::t(
+            "недопустимый путь для удаления",
+            "invalid path for deletion",
+        ));
     }
     let full = PathBuf::from(&mods_folder).join(&rel);
     installer::remove_file(&full.display().to_string()).map_err(|e| e.to_string())?;
@@ -542,6 +609,10 @@ fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
         installed_sort: c.and_then(|v| v.installed_sort.clone()),
         installed_collapsed: c.and_then(|v| v.installed_collapsed),
         card_size: c.and_then(|v| v.card_size.clone()),
+        language: Some(
+            c.map(|v| v.language_str())
+                .unwrap_or_else(|| "ru".to_string()),
+        ),
     }
 }
 
@@ -553,13 +624,22 @@ fn set_app_settings(state: State<'_, AppState>, settings: AppSettings) -> Result
     cfg.installed_sort = settings.installed_sort.clone();
     cfg.installed_collapsed = settings.installed_collapsed;
     cfg.card_size = settings.card_size.clone();
+    cfg.language = settings
+        .language
+        .clone()
+        .filter(|l| {
+            l == "ru" || l == "en" || l == "ru-RU" || l == "en-US" || l == "ru_RU" || l == "en_US"
+        })
+        .map(|l| if l.len() > 2 { &l[..2] } else { &l }.to_string());
+    i18n::set_lang(i18n::Lang::parse(cfg.language_str().as_str()));
     info!(
-        "настройки интерфейса: theme={:?}, accent={:?}, sort={:?}, collapsed={:?}, card={:?}",
+        "настройки интерфейса: theme={:?}, accent={:?}, sort={:?}, collapsed={:?}, card={:?}, lang={}",
         settings.theme,
         settings.accent,
         settings.installed_sort,
         settings.installed_collapsed,
-        settings.card_size
+        settings.card_size,
+        cfg.language_str()
     );
     cfg.save().map_err(|e| {
         error!("не сохранить настройки: {e}");
@@ -570,10 +650,13 @@ fn set_app_settings(state: State<'_, AppState>, settings: AppSettings) -> Result
 /// Открывает системный файловый менеджер с каталогом логов приложения.
 #[tauri::command]
 fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
-    let dir = app
-        .path()
-        .app_log_dir()
-        .map_err(|e| format!("не найти каталог логов: {e}"))?;
+    let dir = app.path().app_log_dir().map_err(|e| {
+        i18n::tf(
+            "не найти каталог логов: {0}",
+            "log directory not found: {0}",
+            &[&e.to_string()],
+        )
+    })?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let opened = open_path(&dir.display().to_string());
     if opened {
@@ -581,7 +664,10 @@ fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
         Ok(())
     } else {
         error!("не удалось открыть папку логов: {}", dir.display());
-        Err("не удалось открыть папку логов".to_string())
+        Err(i18n::t(
+            "не удалось открыть папку логов",
+            "could not open the log folder",
+        ))
     }
 }
 
@@ -624,9 +710,11 @@ pub fn run() {
         )
         .setup(|app| {
             let client = build_client()?;
+            let cfg = Config::load();
+            i18n::set_lang(i18n::Lang::parse(&cfg.language_str()));
             let state = AppState {
                 client,
-                config: Mutex::new(Config::load()),
+                config: Mutex::new(cfg),
                 downloads: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
                 cancels: Arc::new(std::sync::Mutex::new(HashMap::new())),
                 listing_cache: Arc::new(Mutex::new(HashMap::new())),
