@@ -1,14 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  checkUpdates,
-  listInstalled,
-  removeInstalled,
-  updateMod,
-  verifyInstalled,
-} from "../api";
-import type { AppSettings, InstalledMod, IntegrityReport, ModUpdate } from "../types";
+import { useMemo } from "react";
+import type { AppSettings, IntegrityReport } from "../types";
 import { formatBytes } from "../types";
 import { useI18n } from "../i18n/LanguageContext";
+import { useInstalled } from "../hooks/useInstalled";
 
 function IntegrityBadge({ report }: { report: IntegrityReport }) {
   const { t } = useI18n();
@@ -33,90 +27,25 @@ export function InstalledPanel({
   settings: AppSettings | null;
 }) {
   const { t, tp, lang } = useI18n();
-  const [items, setItems] = useState<InstalledMod[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(
-    () => settings?.installedCollapsed ?? false,
-  );
-  const [updates, setUpdates] = useState<Map<string, ModUpdate>>(new Map());
-  const [checking, setChecking] = useState(false);
-  const [integrity, setIntegrity] = useState<Map<string, IntegrityReport> | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const [updating, setUpdating] = useState<Set<string>>(new Set());
+  const {
+    items,
+    error,
+    collapsed,
+    setCollapsed,
+    updates,
+    checking,
+    integrity,
+    verifying,
+    updating,
+    refresh,
+    runIntegrity,
+    doUpdate,
+    runUpdateCheck,
+    remove,
+    managedCount,
+    updateCount,
+  } = useInstalled(settings);
 
-  const refresh = () => {
-    listInstalled()
-      .then((list) => {
-        setItems(list);
-        setError(null);
-      })
-      .catch((e) => {
-        setError(String(e));
-        setItems([]);
-      });
-  };
-
-  const runIntegrity = async () => {
-    setVerifying(true);
-    try {
-      const res = await verifyInstalled();
-      setIntegrity(new Map(res.map((r) => [r.filename, r])));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const doUpdate = async (m: InstalledMod) => {
-    setUpdating((prev) => new Set(prev).add(m.filename));
-    try {
-      await updateMod(m.filename);
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setUpdating((prev) => {
-        const next = new Set(prev);
-        next.delete(m.filename);
-        return next;
-      });
-    }
-    // Событие download::finished приходит асинхронно — даём файлу замениться.
-    window.setTimeout(refresh, 3000);
-  };
-
-  const runUpdateCheck = async (list: InstalledMod[]) => {
-    const managed = list.filter((m) => m.key);
-    if (managed.length === 0) return;
-    setChecking(true);
-    try {
-      const res = await checkUpdates(managed);
-      setUpdates(new Map(res.map((u) => [u.filename, u])));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (items && items.length > 0) runUpdateCheck(items);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
-  const managedCount = useMemo(
-    () => items?.filter((m) => m.key).length ?? 0,
-    [items],
-  );
-  const updateCount = useMemo(
-    () => [...updates.values()].filter((u) => u.hasUpdate).length,
-    [updates],
-  );
   let integritySummary: string | null = null;
   if (integrity) {
     const list = [...integrity.values()];
@@ -129,6 +58,17 @@ export function InstalledPanel({
     });
   }
 
+  const total = items ? items.reduce((acc, m) => acc + m.sizeBytes, 0) : 0;
+  const sortKey = settings?.installedSort ?? "date";
+  const sorted = useMemo(() => {
+    if (!items) return [];
+    return [...items].sort((a, b) => {
+      if (sortKey === "name") return a.filename.localeCompare(b.filename);
+      if (sortKey === "size") return b.sizeBytes - a.sizeBytes;
+      return b.modified - a.modified;
+    });
+  }, [items, sortKey]);
+
   if (error && items?.length === 0) {
     return (
       <div className="panel-empty">
@@ -140,7 +80,8 @@ export function InstalledPanel({
     );
   }
 
-  if (items === null) return <div className="browser-loading">{t("installed_loading")}</div>;
+  if (items === null)
+    return <div className="browser-loading">{t("installed_loading")}</div>;
 
   if (items.length === 0) {
     return (
@@ -152,14 +93,6 @@ export function InstalledPanel({
       </div>
     );
   }
-
-  const total = items.reduce((acc, m) => acc + m.sizeBytes, 0);
-  const sortKey = settings?.installedSort ?? "date";
-  const sorted = [...items].sort((a, b) => {
-    if (sortKey === "name") return a.filename.localeCompare(b.filename);
-    if (sortKey === "size") return b.sizeBytes - a.sizeBytes;
-    return b.modified - a.modified;
-  });
 
   return (
     <div className="installed">
@@ -174,7 +107,7 @@ export function InstalledPanel({
           <button
             className="btn btn-sm"
             disabled={checking}
-            onClick={() => runUpdateCheck(items ?? [])}
+            onClick={() => runUpdateCheck(items)}
             title={t("updates_check_title")}
           >
             {checking
@@ -262,22 +195,7 @@ export function InstalledPanel({
                         {updating.has(m.filename) ? t("updating") : t("update_btn")}
                       </button>
                     )}
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={async () => {
-                        try {
-                          await removeInstalled(m.filename);
-                          setUpdates((prev) => {
-                            const next = new Map(prev);
-                            next.delete(m.filename);
-                            return next;
-                          });
-                          refresh();
-                        } catch (e) {
-                          alert(String(e));
-                        }
-                      }}
-                    >
+                    <button className="btn btn-danger btn-sm" onClick={() => remove(m)}>
                       {t("delete_btn")}
                     </button>
                   </td>

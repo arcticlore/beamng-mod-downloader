@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts tests/frontend/sources.test.ts tests/frontend/i18n.test.ts",
+    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts tests/frontend/sources.test.ts tests/frontend/i18n.test.ts && vitest run tests/frontend/installed.test.tsx",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -20,8 +20,11 @@
     "@tauri-apps/cli": "^2.5.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/react-test-renderer": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "react-test-renderer": "^18.3.1",
     "typescript": "^5.6.3",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.1.11"
   }
 }
