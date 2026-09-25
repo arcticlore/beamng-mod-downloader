@@ -93,6 +93,7 @@ export interface AppSettings {
   installedSort?: string | null;
   installedCollapsed?: boolean | null;
   cardSize?: string | null;
+  style?: string | null;
   language?: string | null;
 }
 
@@ -105,6 +106,12 @@ export interface UiOption {
 export const THEMES: UiOption[] = [
   { id: "dark", labelKey: "theme_dark" },
   { id: "light", labelKey: "theme_light" },
+];
+
+/** Стиль интерфейса: "material" (default, Material 3) | "classic" (v0.3.0 CSS). */
+export const STYLES: UiOption[] = [
+  { id: "material", labelKey: "style_material" },
+  { id: "classic", labelKey: "style_classic" },
 ];
 
 export const CARD_SIZES: UiOption[] = [
