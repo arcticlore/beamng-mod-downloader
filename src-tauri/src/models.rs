@@ -131,6 +131,8 @@ pub struct AppSettings {
     pub installed_collapsed: Option<bool>,
     /// Размер карточек в браузере: "compact" | "normal" | "large".
     pub card_size: Option<String>,
+    /// Стиль интерфейса: "material" (default) | "classic".
+    pub style: Option<String>,
     /// Язык интерфейса: "ru" | "en".
     pub language: Option<String>,
 }

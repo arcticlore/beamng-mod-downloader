@@ -609,6 +609,10 @@ fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
         installed_sort: c.and_then(|v| v.installed_sort.clone()),
         installed_collapsed: c.and_then(|v| v.installed_collapsed),
         card_size: c.and_then(|v| v.card_size.clone()),
+        style: Some(
+            c.map(|v| v.style_str())
+                .unwrap_or_else(|| "material".to_string()),
+        ),
         language: Some(
             c.map(|v| v.language_str())
                 .unwrap_or_else(|| "ru".to_string()),
@@ -624,6 +628,10 @@ fn set_app_settings(state: State<'_, AppState>, settings: AppSettings) -> Result
     cfg.installed_sort = settings.installed_sort.clone();
     cfg.installed_collapsed = settings.installed_collapsed;
     cfg.card_size = settings.card_size.clone();
+    match settings.style.as_deref() {
+        Some("material") | Some("classic") => cfg.style = settings.style.clone(),
+        _ => cfg.style = None,
+    }
     cfg.language = settings
         .language
         .clone()
@@ -633,12 +641,13 @@ fn set_app_settings(state: State<'_, AppState>, settings: AppSettings) -> Result
         .map(|l| if l.len() > 2 { &l[..2] } else { &l }.to_string());
     i18n::set_lang(i18n::Lang::parse(cfg.language_str().as_str()));
     info!(
-        "настройки интерфейса: theme={:?}, accent={:?}, sort={:?}, collapsed={:?}, card={:?}, lang={}",
+        "настройки интерфейса: theme={:?}, accent={:?}, sort={:?}, collapsed={:?}, card={:?}, style={}, lang={}",
         settings.theme,
         settings.accent,
         settings.installed_sort,
         settings.installed_collapsed,
         settings.card_size,
+        cfg.style_str(),
         cfg.language_str()
     );
     cfg.save().map_err(|e| {

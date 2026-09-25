@@ -1,0 +1,630 @@
+/* ============================================================================
+   Material 3 theme — отдельный слой поверх `styles.css` (Classic).
+   ВСЕ правила gated через `html[data-style="material"]`: при классическом стиле
+   ни одно из них не действует, поэтому Classic остаётся побайтово v0.3.0.
+   Цвета берутся только из ролей `--md-sys-color-*`, которые вычисляет
+   `theme.ts` из (акцент, dark/light). Формы — M3 (радиусы, elevation, pill-кнопки).
+   ========================================================================== */
+
+[data-style="material"] {
+  --md-elevation-0: none;
+  --md-elevation-1: 0 1px 3px 1px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --md-elevation-2: 0 2px 6px 2px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --md-elevation-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --md-elevation-4: 0 2px 3px rgba(0, 0, 0, 0.3), 0 6px 10px 4px rgba(0, 0, 0, 0.15);
+  --md-elevation-5: 0 4px 4px rgba(0, 0, 0, 0.3), 0 8px 12px 6px rgba(0, 0, 0, 0.15);
+  --md-shape-xs: 4px;
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-xl: 28px;
+}
+
+[data-theme="dark"][data-style="material"] html {
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-style="material"] html {
+  color-scheme: light;
+}
+
+[data-style="material"] html,
+[data-style="material"] body,
+[data-style="material"] #root {
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] :focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-shape-xs);
+}
+
+/* ---------- app shell ---------- */
+[data-style="material"] .app-header {
+  background: var(--md-sys-color-surface-container);
+  border-bottom: none;
+}
+
+[data-style="material"] .folder-indicator {
+  background: var(--md-sys-color-surface-container-high);
+  border: none;
+  border-radius: 999px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .folder-indicator:hover {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+[data-style="material"] .folder-none {
+  color: var(--md-sys-color-tertiary);
+  background: var(--md-sys-color-tertiary-container);
+}
+
+[data-style="material"] .tabs {
+  border-bottom: none;
+}
+
+[data-style="material"] .tab {
+  color: var(--md-sys-color-on-surface-variant);
+  border-bottom: 3px solid transparent;
+}
+
+[data-style="material"] .tab:hover {
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-state-on-surface-hover);
+}
+
+[data-style="material"] .tab-active {
+  color: var(--md-sys-color-primary);
+  border-bottom-color: var(--md-sys-color-primary);
+}
+
+[data-style="material"] .app-main {
+  background: var(--md-sys-color-surface);
+}
+
+/* ---------- browser toolbar / fields ---------- */
+[data-style="material"] .search-input,
+[data-style="material"] .source-picker-filter .search-input {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-shape-sm);
+  color: var(--md-sys-color-on-surface);
+  padding: 10px 16px;
+}
+
+[data-style="material"] .search-input:hover {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+[data-style="material"] .search-input:focus {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 1px var(--md-sys-color-primary);
+}
+
+[data-style="material"] .category-select {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-shape-sm);
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .category-select option {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .browser-count,
+[data-style="material"] .browser-loading,
+[data-style="material"] .browser-empty,
+[data-style="material"] .panel-empty {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- banners ---------- */
+[data-style="material"] .banner {
+  border-radius: var(--md-shape-sm);
+}
+
+[data-style="material"] .banner-warn {
+  background: var(--md-sys-color-tertiary-container);
+  border: 1px solid transparent;
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+[data-style="material"] .banner-error {
+  background: var(--md-sys-color-error-container);
+  border: 1px solid transparent;
+  color: var(--md-sys-color-on-error-container);
+}
+
+[data-style="material"] .banner-ok {
+  background: var(--md-sys-color-secondary-container);
+  border: 1px solid transparent;
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+[data-style="material"] .banner-hint {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px dashed var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- mod grid / cards ---------- */
+[data-style="material"] .mod-card {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-md);
+  box-shadow: var(--md-elevation-1);
+}
+
+[data-style="material"] .mod-card:hover {
+  transform: none;
+  box-shadow: var(--md-elevation-2);
+}
+
+[data-style="material"] .mod-card-installed {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: var(--md-elevation-1);
+}
+
+[data-style="material"] .mod-thumb {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+[data-style="material"] .mod-thumb-placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .mod-source {
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 999px;
+}
+
+[data-style="material"] .mod-name {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .mod-meta,
+[data-style="material"] .mod-desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .mod-warning {
+  background: var(--md-sys-color-tertiary-container);
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-sm);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+[data-style="material"] .mod-actions {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding: 12px 16px;
+}
+
+[data-style="material"] .mod-dl-label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- buttons (M3: text / filled / filled-error) ---------- */
+[data-style="material"] .btn {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--md-sys-color-primary);
+  padding: 8px 16px;
+  letter-spacing: 0.01em;
+}
+
+[data-style="material"] .btn:hover:not(:disabled) {
+  background: var(--md-sys-state-primary-hover);
+}
+
+[data-style="material"] .btn:active:not(:disabled) {
+  background: var(--md-sys-state-primary-pressed);
+}
+
+[data-style="material"] .btn-primary {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-weight: 500;
+  box-shadow: var(--md-elevation-1);
+}
+
+[data-style="material"] .btn-primary:hover:not(:disabled) {
+  background: var(--md-sys-color-primary);
+  box-shadow: var(--md-elevation-2);
+}
+
+[data-style="material"] .btn-danger {
+  background: var(--md-sys-color-error);
+  border: none;
+  color: var(--md-sys-color-on-error);
+  font-weight: 500;
+  box-shadow: var(--md-elevation-1);
+}
+
+[data-style="material"] .btn-danger:hover:not(:disabled) {
+  background: var(--md-sys-color-error);
+  box-shadow: var(--md-elevation-2);
+}
+
+[data-style="material"] .btn-sm {
+  padding: 4px 12px;
+}
+
+[data-style="material"] .btn:disabled {
+  opacity: 0.38;
+}
+
+/* ---------- progress ---------- */
+[data-style="material"] .progress {
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 999px;
+}
+
+[data-style="material"] .progress-fill {
+  background: var(--md-sys-color-primary);
+  border-radius: 999px;
+}
+
+/* ---------- pagination / installed ---------- */
+[data-style="material"] .pagination {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .installed-summary {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .installed-table th,
+[data-style="material"] .installed-table td {
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+[data-style="material"] .installed-table th {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- badges / pills ---------- */
+[data-style="material"] .badge,
+[data-style="material"] .trust-badge,
+[data-style="material"] .install-mode-badge,
+[data-style="material"] .source-status-badge {
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+[data-style="material"] .badge-repo {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+[data-style="material"] .badge-local {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .badge-ok {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+[data-style="material"] .badge-error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+[data-style="material"] .trust-official,
+[data-style="material"] .trust-verified_forge {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+[data-style="material"] .trust-community {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+[data-style="material"] .trust-third_party {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+[data-style="material"] .trust-custom {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+[data-style="material"] .install-mode-badge {
+  background: var(--md-sys-color-surface-container-high);
+  border-color: var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .source-status-badge {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+/* ---------- modal (M3 dialog) ---------- */
+[data-style="material"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+[data-style="material"] .modal {
+  background: var(--md-sys-color-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-xl);
+  box-shadow: var(--md-elevation-3);
+  padding: 24px;
+}
+
+[data-style="material"] .modal-close {
+  border-radius: 999px;
+  color: var(--md-sys-color-on-surface-variant);
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-style="material"] .modal-close:hover {
+  background: var(--md-sys-state-on-surface-hover);
+}
+
+[data-style="material"] .modal-gallery img {
+  border-radius: var(--md-shape-md);
+}
+
+[data-style="material"] .gallery-thumb {
+  border: 2px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-shape-sm);
+}
+
+[data-style="material"] .gallery-thumb.active {
+  border-color: var(--md-sys-color-primary);
+}
+
+[data-style="material"] .modal-info h2 {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .mod-full-desc,
+[data-style="material"] .hint-file {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- settings ---------- */
+[data-style="material"] .modal-settings h3 {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .current-path {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .current-path code {
+  color: var(--md-sys-color-primary);
+}
+
+[data-style="material"] .hint {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .candidate-list {
+  gap: 2px;
+}
+
+[data-style="material"] .candidate {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-md);
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .candidate:hover {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+[data-style="material"] .candidate-active {
+  background: var(--md-sys-color-primary-container);
+  border-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* M3 segmented buttons для темы/стиля/карточек */
+[data-style="material"] .theme-toggle .btn {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .theme-toggle .btn:hover:not(:disabled) {
+  background: var(--md-sys-state-on-surface-hover);
+}
+
+[data-style="material"] .theme-toggle .btn-active {
+  background: var(--md-sys-color-secondary-container);
+  border-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-weight: 500;
+}
+
+[data-style="material"] .theme-toggle .btn-active:hover:not(:disabled) {
+  background: var(--md-sys-color-secondary-container);
+}
+
+[data-style="material"] .swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+
+[data-style="material"] .swatch-active {
+  border-color: var(--md-sys-color-surface);
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+  outline: none;
+}
+
+[data-style="material"] .color-input {
+  width: 44px;
+  height: 36px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-shape-sm);
+}
+
+/* ---------- downloads ---------- */
+[data-style="material"] .downloads-summary {
+  background: var(--md-sys-color-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-md);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .download-row {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-md);
+  box-shadow: var(--md-elevation-1);
+}
+
+[data-style="material"] .download-row:hover {
+  box-shadow: var(--md-elevation-2);
+}
+
+[data-style="material"] .download-row-active {
+  border-color: var(--md-sys-color-primary);
+}
+
+[data-style="material"] .download-name {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .download-eta,
+[data-style="material"] .download-size,
+[data-style="material"] .download-speed {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- toast (M3 snackbar) ---------- */
+[data-style="material"] .toast {
+  background: var(--md-sys-color-inverse-surface);
+  border: none;
+  color: var(--md-sys-color-inverse-on-surface);
+  border-radius: var(--md-shape-xs);
+  box-shadow: var(--md-elevation-3);
+  font-size: 14px;
+}
+
+/* ---------- scrollbars ---------- */
+[data-style="material"] ::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+}
+
+[data-style="material"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--md-sys-color-outline);
+}
+
+/* ---------- source picker / source list ---------- */
+[data-style="material"] .source-group-label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .source-item {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid transparent;
+  border-radius: var(--md-shape-md);
+}
+
+[data-style="material"] .source-item-off {
+  opacity: 0.6;
+}
+
+[data-style="material"] .source-item-name {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .switch-label {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .switch-label-secondary {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .switch-box {
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  border: 2px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+[data-style="material"] .switch-box::after {
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  background: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .switch-input:checked + .switch-box {
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+
+[data-style="material"] .switch-input:checked + .switch-box::after {
+  left: 24px;
+  background: var(--md-sys-color-on-primary);
+}
+
+[data-style="material"] .switch-input:disabled + .switch-box {
+  opacity: 0.38;
+}
+
+[data-style="material"] .source-picker-trigger-zero {
+  border: 1px solid var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-tertiary);
+}
+
+[data-style="material"] .source-picker-panel {
+  background: var(--md-sys-color-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-lg);
+  box-shadow: var(--md-elevation-3);
+}
+
+[data-style="material"] .source-picker-title {
+  color: var(--md-sys-color-on-surface);
+}
+
+[data-style="material"] .source-picker-hint,
+[data-style="material"] .source-picker-why {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+[data-style="material"] .source-picker-footer {
+  border-top-color: var(--md-sys-color-outline-variant);
+}
+
+/* ---------- source chips (M3 filter chips) ---------- */
+[data-style="material"] .source-chip {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-shape-sm);
+  color: var(--md-sys-color-on-surface-variant);
+  height: 32px;
+  padding: 4px 12px;
+}
+
+[data-style="material"] .source-chip:hover {
+  background: var(--md-sys-state-on-surface-hover);
+  color: var(--md-sys-color-on-surface);
+}

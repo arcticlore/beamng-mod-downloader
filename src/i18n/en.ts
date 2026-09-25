@@ -46,6 +46,7 @@ export const en = {
   sources_search_all_hint:
     "Search is active across all enabled sources that support it. Turn off search for a source to search a subset.",
   appearance_section_title: "Appearance",
+  appearance_style: "Style:",
   appearance_theme: "Theme:",
   appearance_accent: "Accent color:",
   appearance_custom_color: "Custom color",
@@ -85,6 +86,9 @@ export const en = {
 
   theme_dark: "Dark",
   theme_light: "Light",
+
+  style_material: "Material 3",
+  style_classic: "Classic",
   cardsize_compact: "Compact",
   cardsize_normal: "Normal",
   cardsize_large: "Large",

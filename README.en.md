@@ -20,7 +20,8 @@ Features:
   updates) — gates live in the Tauri commands;
 - mod browser sorting: relevance / recency / name / popularity / size;
 - mod cards: name, author, thumbnail, description, download count, size;
-- interface customization: dark/light theme, accent color, card size, installed-panel sort and collapse;
+- interface customization: **Material 3 (default) or the v0.3.0 classic look** (switchable in
+  Settings → Appearance), dark/light theme, accent color, card size, installed-panel sort and collapse;
 - **Russian and English interface** — the language is switched in Settings → Appearance
   (`language` in config.json, default detected from the system locale; old configs stay in Russian);
 - logging: `beamng.log` in the app data directory (current speed, network errors, actions),
@@ -29,14 +30,16 @@ Features:
   (the `mods` folder of the current version);
 - an "Installed" tab with the `.zip` list and removal;
 - config stored at `~/.config/beamng-mod-downloader/config.json` (`mods_folder`, `theme`, `accent`,
-  `installed_sort`, `installed_collapsed`, `card_size`, `language`, `enabled_sources`, `selected_sources`).
+  `installed_sort`, `installed_collapsed`, `card_size`, `style`, `language`, `enabled_sources`, `selected_sources`).
 
 ## Structure
 
 ```
 src/                        React frontend (TypeScript, Vite)
 src/api.ts                  thin wrapper over Tauri commands (invoke with logging)
-src/theme.ts                theme and accent color application
+src/theme.ts                style application (Material 3 tokens / Classic), theme and accent color
+src/material.css            standalone Material 3 layer (gated: html[data-style="material"])
+src/styles.css              classic v0.3.0 CSS (untouched — this IS the "Classic" look)
 src/i18n/                   interface dictionaries: ru.ts / en.ts, t()/tp() helpers, LanguageContext
 src/sources.ts              pure source-selection logic (presets, file names, deduplication)
 src/SourcesContext.tsx      registry and source-selection state for the whole frontend
@@ -103,6 +106,7 @@ It contains: app startup, mods folder changes, every invoke call, search/downloa
 Fields: `mods_folder` — path to the mods folder; `theme` — `"dark"`/
 `"light"`; `accent` — HEX color; `installed_sort` — `"date"`/`"name"`/`"size"`;
 `installed_collapsed` — boolean; `card_size` — `"compact"`/`"normal"`/`"large"`;
+`style` — `"material"` (default, Material 3) or `"classic"` (the v0.3.0 look);
 `language` — `"ru"`/`"en"` (omission = system locale detection for new configs, `"ru"`
 for old configs written before this field existed).
 

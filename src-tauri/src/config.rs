@@ -11,6 +11,9 @@ pub struct Config {
     pub installed_sort: Option<String>,
     pub installed_collapsed: Option<bool>,
     pub card_size: Option<String>,
+    /// Стиль интерфейса: "material" | "classic". `None` у существующих конфигов
+    /// v0.3.0 — материал становится default-стилем (Material 3).
+    pub style: Option<String>,
     /// Язык интерфейса: "ru" | "en". `None` до первой миграции/установки
     /// (для уже существующих конфигов 0.3.0 остаётся русский).
     pub language: Option<String>,
@@ -111,6 +114,15 @@ impl Config {
             Some(v) if v == "en" || v == "en-US" || v == "en_US" => "en".to_string(),
             Some(v) if v == "ru" || v == "ru-RU" || v == "ru_RU" => "ru".to_string(),
             _ => "ru".to_string(),
+        }
+    }
+
+    /// Нормализованный стиль интерфейса; неизвестное значение = "material"
+    /// (Material 3 — default-стиль v0.4.x; старые конфиги без поля получают его).
+    pub fn style_str(&self) -> String {
+        match self.style.as_deref() {
+            Some("classic") => "classic".to_string(),
+            _ => "material".to_string(),
         }
     }
 }
@@ -254,5 +266,25 @@ mod tests {
             ..Config::default()
         };
         assert_eq!(cfg.language_str(), "ru");
+    }
+
+    #[test]
+    fn missing_style_defaults_to_material() {
+        let cfg = Config::default();
+        assert_eq!(cfg.style_str(), "material");
+        let classic = Config {
+            style: Some("classic".to_string()),
+            ..Config::default()
+        };
+        assert_eq!(classic.style_str(), "classic");
+    }
+
+    #[test]
+    fn unknown_style_falls_back_to_material() {
+        let cfg = Config {
+            style: Some("amoled".to_string()),
+            ..Config::default()
+        };
+        assert_eq!(cfg.style_str(), "material");
     }
 }

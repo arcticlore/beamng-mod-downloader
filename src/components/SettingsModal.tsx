@@ -22,7 +22,7 @@ import {
 } from "../sources";
 import { useI18n } from "../i18n/LanguageContext";
 import type { AppSettings, ModsFolderCandidate, SourceGroup } from "../types";
-import { CARD_SIZES, INSTALLED_SORTS, THEMES } from "../types";
+import { CARD_SIZES, INSTALLED_SORTS, STYLES, THEMES } from "../types";
 
 const GROUPS: SourceGroup[] = ["official", "forges", "community", "custom"];
 
@@ -386,6 +386,18 @@ export function SettingsModal({ onClose, onChanged }: Props) {
 
         <section>
           <h3>{t("appearance_section_title")}</h3>
+          <div className="hint">{t("appearance_style")}</div>
+          <div className="theme-toggle">
+            {STYLES.map((opt) => (
+              <button
+                key={opt.id}
+                className={`btn ${(settings.style ?? "material") === opt.id ? "btn-active" : ""}`}
+                onClick={() => saveSettings({ ...settings, style: opt.id })}
+              >
+                {t(opt.labelKey)}
+              </button>
+            ))}
+          </div>
           <div className="hint">{t("language_label")}</div>
           <div className="theme-toggle">
             {LANGUAGES.map((l) => (

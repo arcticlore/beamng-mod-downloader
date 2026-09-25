@@ -47,6 +47,7 @@ export const ru = {
   sources_search_all_hint:
     "Поиск активен во всех включённых источниках с поддержкой поиска. Снимите «Поиск» у источника, чтобы искать в подмножестве.",
   appearance_section_title: "Внешний вид",
+  appearance_style: "Стиль:",
   appearance_theme: "Тема:",
   appearance_accent: "Акцентный цвет:",
   appearance_custom_color: "Свой цвет",
@@ -86,6 +87,8 @@ export const ru = {
 
   theme_dark: "Тёмная",
   theme_light: "Светлая",
+  style_material: "Material 3",
+  style_classic: "Classic",
   cardsize_compact: "Компактные",
   cardsize_normal: "Обычные",
   cardsize_large: "Крупные",
