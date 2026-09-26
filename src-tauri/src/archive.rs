@@ -383,7 +383,7 @@ mod tests {
     fn patch_cd_u_size(raw: &mut [u8], cd_start: usize, i: usize, value: u32) {
         let mut pos = cd_start;
         let mut found = 0;
-        while pos + 46 <= raw.len() && &raw[pos..pos + 4] == CD_SIG {
+        while pos + 46 <= raw.len() && raw[pos..pos + 4] == CD_SIG {
             if found == i {
                 raw[pos + 24..pos + 28].copy_from_slice(&value.to_le_bytes());
                 return;

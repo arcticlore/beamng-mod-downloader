@@ -115,8 +115,7 @@ mod tests {
     fn key_to_filename_accepts_allowlisted_zip_urls() {
         let (url, name) =
             key_to_filename("https://github.com/o/r/releases/download/v1/car%20pack.zip")
-                .expect("валидный github-zip")
-                .into();
+                .expect("валидный github-zip");
         assert_eq!(
             url,
             "https://github.com/o/r/releases/download/v1/car%20pack.zip"
