@@ -15,6 +15,7 @@ import { normalizeLang, t as tr } from "./i18n";
 import { DetailModal } from "./components/DetailModal";
 import { DownloadsPanel } from "./components/DownloadsPanel";
 import { InstalledPanel } from "./components/InstalledPanel";
+import { LinkImportModal } from "./components/LinkImportModal";
 import { ModsBrowser } from "./components/ModsBrowser";
 import { SettingsModal } from "./components/SettingsModal";
 import { MaterialApp } from "./components/material/MaterialApp";
@@ -41,6 +42,7 @@ function AppInner() {
   const [view, setView] = useState<View>("browse");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ModItem | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [installed, setInstalled] = useState<InstalledMod[]>([]);
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -225,7 +227,15 @@ function AppInner() {
           installedNames={installedNames}
           installedList={installedList}
           toast={toast}
+          onImportLink={() => setLinkOpen(true)}
         />
+        {linkOpen && (
+          <LinkImportModal
+            variant="material"
+            onToast={showToast}
+            onClose={() => setLinkOpen(false)}
+          />
+        )}
       </LanguageProvider>
     );
   }
@@ -293,6 +303,7 @@ function AppInner() {
               onInstall={onInstall}
               onInfo={setDetailItem}
               onOpenSettings={() => setSettingsOpen(true)}
+              onImportLink={() => setLinkOpen(true)}
             />
           )}
         </main>
@@ -324,6 +335,13 @@ function AppInner() {
         )}
 
         {toast && <div className="toast">{toast}</div>}
+        {linkOpen && (
+          <LinkImportModal
+            variant="classic"
+            onToast={showToast}
+            onClose={() => setLinkOpen(false)}
+          />
+        )}
       </div>
     </LanguageProvider>
   );

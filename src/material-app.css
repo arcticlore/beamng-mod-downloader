@@ -1521,3 +1521,17 @@
     max-width: none;
   }
 }
+/* ---------- link/zip import dialog (material) ---------- */
+[data-style="material"] .li-modal {
+  max-width: 560px;
+  overflow-y: auto;
+}
+[data-style="material"] .li-modal .li-tabs {
+  padding: 4px 26px 0;
+}
+[data-style="material"] .li-modal .li-tabs + .li-body {
+  padding: 14px 26px 26px;
+}
+[data-style="material"] .li-modal .error-text {
+  padding: 0 26px;
+}

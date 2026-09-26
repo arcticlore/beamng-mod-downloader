@@ -5,6 +5,11 @@
 //! границы локальных заголовков и данных). Это отсекает усечённые и повреждённые
 //! архивы без полной распаковки и без внешних крэйтов. ZIP64-маркеры
 //! (0xFFFF/0xFFFFFFFF) не расшифровываются, но и не считаются ошибкой.
+//!
+//! Кроме целостности здесь же действуют **лимиты** (защита от zip-bomb/DoS):
+//! `MAX_ZIP_ENTRIES` — максимальное число записей, `MAX_UNCOMPRESSED_TOTAL` —
+//! суммарный распакованный размер (каталог читается целиком, поэтому суммарный
+//! размер по `u_size` считается в самом начале, не распаковывая ничего).
 
 use anyhow::{anyhow, Context, Result};
 use sha2::{Digest, Sha256};
@@ -16,6 +21,15 @@ const LFH_SIG: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
 const CD_SIG: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
 const EOCD_MIN: u64 = 22;
 const MAX_COMMENT: u64 = 0xffff;
+
+/// Максимальное число записей в архиве (анти-бомба: не даём обойти каталог
+/// одним махом тысяч записей).
+pub const MAX_ZIP_ENTRIES: usize = 10_000;
+
+/// Максимальный суммарный распакованный объём — 4 ГиБ. Один u32-режим
+/// (ZIP64-маркер 0xFFFFFFFF игнорируется) никогда не может сам превысить
+/// этот лимит, поэтому лимит атакуем только серией крупных записей.
+pub const MAX_UNCOMPRESSED_TOTAL: u64 = 4 * 1024 * 1024 * 1024;
 
 /// Результат структурной проверки архива.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +161,13 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
             "the archive has no entries"
         )));
     }
+    if entries > MAX_ZIP_ENTRIES {
+        return Err(anyhow!(crate::i18n::tf(
+            "в архиве слишком много записей: {0} (максимум {1})",
+            "the archive has too many entries: {0} (maximum {1})",
+            &[&entries.to_string(), &MAX_ZIP_ENTRIES.to_string()],
+        )));
+    }
     let cd_size = rd_u32(&tail, rel + 12) as u64;
     let cd_offset = rd_u32(&tail, rel + 16) as u64;
     let cd_end = cd_offset.checked_add(cd_size).ok_or_else(|| {
@@ -245,6 +266,13 @@ pub fn validate_zip(path: &Path) -> Result<ZipSummary> {
                     "total uncompressed size overflow"
                 ))
             })?;
+            if total_uncompressed > MAX_UNCOMPRESSED_TOTAL {
+                return Err(anyhow!(crate::i18n::tf(
+                    "суммарный распакованный объём превышает лимит {0} ГиБ",
+                    "total uncompressed size exceeds the {0} GiB limit",
+                    &[&(MAX_UNCOMPRESSED_TOTAL / (1024 * 1024 * 1024)).to_string()],
+                )));
+            }
             let data_end = local_off + 30 + l_name_len + l_extra_len + c_size;
             if data_end > cd_offset {
                 return Err(anyhow!(crate::i18n::tf(
@@ -293,53 +321,92 @@ mod tests {
 
     /// Строит корректный одногофайловый zip (метод "stored").
     fn build_zip(name: &str, data: &[u8]) -> Vec<u8> {
+        build_zip_multi(&[(name, data)])
+    }
+
+    /// Строит zip с несколькими записями (метод "stored"): локальные заголовки,
+    /// затем центральный каталог, затем EOCD.
+    fn build_zip_multi(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut out = Vec::new();
-        // Local file header
-        out.extend_from_slice(&LFH_SIG);
-        out.extend_from_slice(&20_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u32.to_le_bytes());
-        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(name.as_bytes());
-        out.extend_from_slice(data);
-        let local_off = 0_u32;
-        // Central directory
+        let mut locals = Vec::new();
+        for (name, data) in entries {
+            let local_off = out.len() as u32;
+            out.extend_from_slice(&LFH_SIG);
+            out.extend_from_slice(&20_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u32.to_le_bytes());
+            out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(name.as_bytes());
+            out.extend_from_slice(data);
+            locals.push((local_off, name, data));
+        }
         let cd_start = out.len() as u32;
-        out.extend_from_slice(&CD_SIG);
-        out.extend_from_slice(&20_u16.to_le_bytes());
-        out.extend_from_slice(&20_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u32.to_le_bytes());
-        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&0_u32.to_le_bytes());
-        out.extend_from_slice(&local_off.to_le_bytes());
-        out.extend_from_slice(name.as_bytes());
+        for (local_off, name, data) in &locals {
+            out.extend_from_slice(&CD_SIG);
+            out.extend_from_slice(&20_u16.to_le_bytes());
+            out.extend_from_slice(&20_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u32.to_le_bytes());
+            out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u16.to_le_bytes());
+            out.extend_from_slice(&0_u32.to_le_bytes());
+            out.extend_from_slice(&local_off.to_le_bytes());
+            out.extend_from_slice(name.as_bytes());
+        }
         let cd_size = (out.len() - cd_start as usize) as u32;
-        // EOCD
         out.extend_from_slice(&EOCD_SIG);
         out.extend_from_slice(&0_u16.to_le_bytes());
         out.extend_from_slice(&0_u16.to_le_bytes());
-        out.extend_from_slice(&1_u16.to_le_bytes());
-        out.extend_from_slice(&1_u16.to_le_bytes());
+        out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
         out.extend_from_slice(&cd_size.to_le_bytes());
         out.extend_from_slice(&cd_start.to_le_bytes());
         out.extend_from_slice(&0_u16.to_le_bytes());
         out
+    }
+
+    /// Патчит `u_size` в i-й записи центрального каталога.
+    fn patch_cd_u_size(raw: &mut [u8], cd_start: usize, i: usize, value: u32) {
+        let mut pos = cd_start;
+        let mut found = 0;
+        while pos + 46 <= raw.len() && raw[pos..pos + 4] == CD_SIG {
+            if found == i {
+                raw[pos + 24..pos + 28].copy_from_slice(&value.to_le_bytes());
+                return;
+            }
+            found += 1;
+            let name_len = u16::from_le_bytes([raw[pos + 28], raw[pos + 29]]) as usize;
+            let extra_len = u16::from_le_bytes([raw[pos + 30], raw[pos + 31]]) as usize;
+            let comment_len = u16::from_le_bytes([raw[pos + 32], raw[pos + 33]]) as usize;
+            pos += 46 + name_len + extra_len + comment_len;
+        }
+        panic!("не нашли {i}-ю запись каталога");
+    }
+
+    /// Смещение центрального каталога из EOCD (без комментария — как в `build_zip_*`).
+    fn cd_start_of(raw: &[u8]) -> usize {
+        let eocd_at = raw.len() - 22;
+        let cd_size = u32::from_le_bytes([
+            raw[eocd_at + 12],
+            raw[eocd_at + 13],
+            raw[eocd_at + 14],
+            raw[eocd_at + 15],
+        ]) as usize;
+        eocd_at - cd_size
     }
 
     #[test]
@@ -355,6 +422,56 @@ mod tests {
         let s = validate_zip(&path).expect("валидный zip должен пройти");
         assert_eq!(s.entries, 1);
         assert_eq!(s.total_uncompressed, "hello beamng".len() as u64);
+        cleanup(&path);
+    }
+
+    #[test]
+    fn multi_entry_zip_parses() {
+        let raw = build_zip_multi(&[("a.txt", b"1"), ("b.txt", b"22"), ("c.txt", b"333")]);
+        let path = write_temp(&raw, "multi");
+        let s = validate_zip(&path).expect("многозаписный zip должен пройти");
+        assert_eq!(s.entries, 3);
+        assert_eq!(s.total_uncompressed, 6);
+        cleanup(&path);
+    }
+
+    #[test]
+    fn entry_count_limit_rejects_huge_catalog() {
+        let mut raw = build_zip("mod/main.txt", b"hello");
+        let eocd_at = raw.len() - 22;
+        raw[eocd_at + 10..eocd_at + 12].copy_from_slice(&20000_u16.to_le_bytes());
+        let path = write_temp(&raw, "many");
+        let e = validate_zip(&path).expect_err("лимит записей должен сработать");
+        assert!(e.to_string().contains("слишком много записей"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn uncompressed_total_limit_rejects_massive_entries() {
+        // ZIP64-маркер (0xFFFFFFFF) не считается; две записи по
+        // 0xFFFFFFFE в сумме превышают лимит 4 ГиБ.
+        let mut raw = build_zip_multi(&[("a.txt", b"1"), ("b.txt", b"2"), ("c.txt", b"3")]);
+        let cd_start = cd_start_of(&raw);
+        patch_cd_u_size(&mut raw, cd_start, 0, 0xffff_ffff);
+        patch_cd_u_size(&mut raw, cd_start, 1, 0xffff_fffe);
+        patch_cd_u_size(&mut raw, cd_start, 2, 0xffff_fffe);
+        let path = write_temp(&raw, "big");
+        let e = validate_zip(&path).expect_err("суммарный лимит должен сработать");
+        assert!(e.to_string().contains("лимит"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn uncompressed_total_under_limit_ok() {
+        // Маркер пережигается, остальное укладывается в лимит.
+        let mut raw = build_zip_multi(&[("a.txt", b"1"), ("b.txt", b"22"), ("c.txt", b"22")]);
+        let cd_start = cd_start_of(&raw);
+        patch_cd_u_size(&mut raw, cd_start, 0, 0xffff_ffff);
+        patch_cd_u_size(&mut raw, cd_start, 1, 0xffff_fffe);
+        let path = write_temp(&raw, "ok");
+        let s = validate_zip(&path).expect("сумма ниже лимита");
+        assert_eq!(s.entries, 3);
+        assert_eq!(s.total_uncompressed, 0xffff_fffe + 2);
         cleanup(&path);
     }
 

@@ -1,8 +1,10 @@
 pub mod beamngforum;
 pub mod beamngweb;
 pub mod codeberg;
+pub mod directurl;
 pub mod github;
 pub mod gitlab;
+pub mod probe;
 pub mod registry;
 pub mod worldofmods;
 
@@ -86,6 +88,7 @@ pub async fn search(
         "gitlab" => gitlab::search(client, query, category, page, order).await,
         "codeberg" => codeberg::search(client, query, category, page, order).await,
         "beamngforum" => beamngforum::search(client, query, category, page, order).await,
+        "directurl" => directurl::search(client, query, category, page, order).await,
         other => Err(SourceError::Unavailable(i18n::tf(
             "источник `{0}` пока не реализован",
             "source `{0}` is not implemented yet",
@@ -108,6 +111,7 @@ pub async fn detail(
         "gitlab" => gitlab::detail(client, mod_id, key).await,
         "codeberg" => codeberg::detail(client, mod_id, key).await,
         "beamngforum" => beamngforum::detail(client, mod_id, key).await,
+        "directurl" => directurl::detail(client, mod_id, key).await,
         other => Err(SourceError::Unavailable(i18n::tf(
             "источник `{0}` пока не реализован",
             "source `{0}` is not implemented yet",
@@ -131,6 +135,7 @@ pub async fn resolve_download(
         "gitlab" => gitlab::resolve_download(client, key).await,
         "codeberg" => codeberg::resolve_download(client, key).await,
         "beamngforum" => beamngforum::resolve_download(client, key).await,
+        "directurl" => directurl::resolve_download(client, key).await,
         other => Err(SourceError::Unavailable(i18n::tf(
             "источник `{0}` пока не реализован",
             "source `{0}` is not implemented yet",

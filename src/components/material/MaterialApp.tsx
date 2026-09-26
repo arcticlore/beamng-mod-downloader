@@ -41,6 +41,7 @@ export interface MaterialAppProps {
   installedNames: Set<string>;
   installedList: { filename: string; path: string }[];
   toast: string | null;
+  onImportLink: () => void;
 }
 
 export function MaterialApp({
@@ -62,6 +63,7 @@ export function MaterialApp({
   installedNames,
   installedList,
   toast,
+  onImportLink,
 }: MaterialAppProps) {
   const { t } = useI18n();
   const activeNav = NAV.find((n) => n.id === view) ?? NAV[0];
@@ -138,6 +140,7 @@ export function MaterialApp({
               onInstall={onInstall}
               onInfo={setDetailItem}
               onOpenSettings={() => setSettingsOpen(true)}
+              onImportLink={onImportLink}
             />
           )}
         </main>

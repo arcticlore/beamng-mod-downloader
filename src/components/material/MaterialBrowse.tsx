@@ -21,6 +21,7 @@ interface Props {
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
   onOpenSettings: () => void;
+  onImportLink: () => void;
 }
 
 export function MaterialBrowse({
@@ -30,6 +31,7 @@ export function MaterialBrowse({
   onInstall,
   onInfo,
   onOpenSettings,
+  onImportLink,
 }: Props) {
   const { filenameFor, labelOf } = useSources();
   const { t, tp } = useI18n();
@@ -149,6 +151,9 @@ export function MaterialBrowse({
         </label>
 
         <span className="m3-filter-spacer" />
+        <button className="m3-btn m3-btn-outline" onClick={onImportLink}>
+          + {t("link_import_open")}
+        </button>
       </div>
 
       {multi && (

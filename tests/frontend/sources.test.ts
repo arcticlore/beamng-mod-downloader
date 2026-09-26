@@ -74,16 +74,42 @@ const REGISTRY: SourceDescriptor[] = [
     label: "Форум BeamNG",
     group: "official",
     trustLevel: "official",
-    installMode: "manual_external",
+    enabledByDefault: false,
+    legacyDefault: false,
+    homepage: "https://www.beamng.com/community/",
+    termsOrPolicyUrl: "https://www.beamng.com/help/terms-of-service/",
+    warning: "search requires sign-in",
+    installMode: "mods_zip",
+    filenameRule: "basename",
     capabilities: {
       search: false,
       categories: false,
       pagination: false,
-      detail: false,
-      directZipDownload: false,
-      manualDownload: true,
+      detail: true,
+      directZipDownload: true,
+      manualDownload: false,
       checksums: false,
-      updateDetection: false,
+      updateDetection: true,
+    },
+  }),
+  regd({
+    id: "directurl",
+    label: "Прямая ссылка",
+    group: "custom",
+    trustLevel: "custom",
+    legacyDefault: false,
+    warning: "arbitrary archive",
+    installMode: "mods_zip",
+    filenameRule: "key_stem",
+    capabilities: {
+      search: false,
+      categories: false,
+      pagination: false,
+      detail: true,
+      directZipDownload: true,
+      manualDownload: false,
+      checksums: false,
+      updateDetection: true,
     },
   }),
 ];
@@ -218,8 +244,25 @@ test("filterSources: case-insensitive по label и id, сохраняет по�
 
 test("registry order/group order сохраняется", () => {
   const ids = filterSources(REGISTRY, "").map((d) => d.id);
-  // official (beamngweb, beamngforum), forges (github), community (worldofmods).
-  assert.deepEqual(ids, ["beamngweb", "beamngforum", "github", "worldofmods"]);
+  // official (beamngweb, beamngforum), forges (github), community (worldofmods), custom (directurl).
+  assert.deepEqual(ids, ["beamngweb", "beamngforum", "github", "worldofmods", "directurl"]);
+});
+
+test("link-import портрет registry: directurl — custom/mods_zip/key_stem; forum — mods_zip/basename", () => {
+  const forum = REGISTRY.find((d) => d.id === "beamngforum")!;
+  const direct = REGISTRY.find((d) => d.id === "directurl")!;
+  assert.equal(forum.installMode, "mods_zip");
+  assert.equal(forum.filenameRule, "basename");
+  assert.equal(forum.capabilities.directZipDownload, true);
+  assert.equal(forum.capabilities.updateDetection, true);
+  assert.equal(direct.group, "custom");
+  assert.equal(direct.trustLevel, "custom");
+  assert.equal(direct.enabledByDefault, false);
+  assert.equal(direct.legacyDefault, false);
+  assert.equal(direct.installMode, "mods_zip");
+  assert.equal(direct.filenameRule, "key_stem");
+  assert.equal(direct.capabilities.search, false);
+  assert.equal(direct.capabilities.updateDetection, true);
 });
 
 test("dedupById: убирает повторы по source:id, сохраняя порядок", () => {

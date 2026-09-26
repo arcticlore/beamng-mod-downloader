@@ -59,6 +59,11 @@ export const getCategories = (source: string) => call<SourceCategory[]>("get_cat
 
 export const installMod = (req: InstallRequest) => call<string>("install_mod", { req });
 
+export const installFromUrl = (url: string) => call<string>("install_from_url", { url });
+
+export const importLocalZip = (sourcePath: string) =>
+  call<string>("import_local_zip", { sourcePath });
+
 export const getDownloads = () => call<DownloadState[]>("get_downloads");
 
 export const cancelDownload = (key: string) => call<void>("cancel_download", { key });
