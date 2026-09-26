@@ -940,6 +940,7 @@
   width: 100%;
   max-width: 900px;
   max-height: calc(100vh - 72px);
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;

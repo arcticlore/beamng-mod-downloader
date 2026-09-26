@@ -116,7 +116,9 @@ staging + структурную проверку zip + no-clobber и в ledger 
 файл копируется в staging `.part`, проходит ту же структурную проверку zip
 (magic + central directory + лимиты записей и распакованного объёма + опасные
 пути), затем no-clobber-переименование в папку модов. Локальный источник не
-создаёт сетевых запросов, ledger не пишется.
+создаёт сетевых запросов, ledger не пишется — а раз записи ledger нет,
+`check_updates` такой файл пропускает (T3.7): локальный импорт **не участвует
+в проверке обновлений**.
 
 ## 4. Статус
 
@@ -131,7 +133,7 @@ staging + структурную проверку zip + no-clobber и в ledger 
 | T3.7 | release/asset identity + честный update | затем: PR update-flow |
 | T3.8 | capabilities-минимум + CSP != null | затем: PR runtime-security |
 | T3.9 | enabled-гейт в backend-командах + санитизация конфига | PR sources (этот) |
-| T3.10 | локальный импорт: staging + zip-проверка + no-clobber, без ledger | PR sources (этот) |
+| T3.10 | локальный импорт: staging + zip-проверка + no-clobber, без ledger и без проверки обновлений | PR sources (этот) |
 | — | CI: fmt/test/clippy/ts/build/audit/version/static | PR foundation (этот) |
 | — | CodeQL, пин Actions по SHA, release gate | PR foundation (этот) |
 
