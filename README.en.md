@@ -18,7 +18,7 @@ Features:
   - **GitHub releases** — search by `topic:beamng` via the GitHub Search API, downloading `.zip` from the latest release directly from `objects.githubusercontent.com`; no authorization required (in-memory API response caching);
   - **BeamNG Forum** — search requires a browser sign-in, so the source is disabled by default; installation works from a canonical attachment link `…/attachments/<id>/` (the "Add a mod" button): the app recognizes the link, downloads and verifies the archive on its own;
   - **Direct link** — an arbitrary `.zip` from a direct http/https URL, behind an allowlist of domains and an SSRF gate; also disabled by default and enabled from the same "Add a mod" dialog;
-- an **"Add a mod"** button in the browser: paste a link (forum attachment or direct `.zip`) and install it, or import a local `.zip` file; every import goes through the shared pipeline — `.part` staging, structural zip check (entry-count/uncompressed-size limits), no-clobber; local imports are not written to the ledger (the file is local by origin);
+- an **"Add a mod"** button in the browser: paste a link (forum attachment or direct `.zip`) and install it, or import a local `.zip` file; every import goes through the shared pipeline — `.part` staging, structural zip check (entry-count/uncompressed-size limits), no-clobber; local imports are not written to the ledger (the file is local by origin) and are therefore excluded from update detection;
 - a disabled source is **never queried over the network** (search, details, install,
   updates) — gates live in the Tauri commands;
 - mod browser sorting: relevance / recency / name / popularity / size;
