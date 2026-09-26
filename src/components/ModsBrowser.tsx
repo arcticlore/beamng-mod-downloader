@@ -16,6 +16,7 @@ interface Props {
   onInstall: (item: ModItem) => void;
   onInfo: (item: ModItem) => void;
   onOpenSettings: () => void;
+  onImportLink: () => void;
 }
 
 export function ModsBrowser({
@@ -26,6 +27,7 @@ export function ModsBrowser({
   onInstall,
   onInfo,
   onOpenSettings,
+  onImportLink,
 }: Props) {
   const { filenameFor, labelOf } = useSources();
   const { t, tp } = useI18n();
@@ -91,6 +93,13 @@ export function ModsBrowser({
             onOpenSettings={onOpenSettings}
           />
         </div>
+        <button
+          className="btn btn-sm"
+          onClick={onImportLink}
+          title={t("link_import_title")}
+        >
+          + {t("link_import_open")}
+        </button>
         {categorySelect && (
           <select
             className="category-select"

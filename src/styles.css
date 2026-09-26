@@ -1114,3 +1114,95 @@ body,
   padding: 0;
   font-size: 12px;
 }
+/* ---------- link/zip import modal ---------- */
+.li-modal .error-text {
+  margin: 8px 0;
+}
+.li-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.li-tab {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.li-tab-active {
+  background: var(--bg-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.li-title {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.li-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.li-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.li-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.li-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+.li-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.li-hint-title {
+  font-weight: 600;
+}
+.li-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-left: 3px solid var(--border);
+  background: var(--bg);
+  border-radius: 6px;
+}
+.li-warn {
+  font-size: 12px;
+  color: var(--warn);
+  padding: 8px 10px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+.li-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+.li-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.li-file {
+  font-size: 12px;
+  color: var(--text-dim);
+  word-break: break-all;
+}

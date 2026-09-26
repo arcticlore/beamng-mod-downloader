@@ -365,6 +365,195 @@ async fn install_mod(
     .map_err(|e| e.to_string())
 }
 
+/// Установка мода по вставленной ссылке. Маршрутизация по форме ссылки:
+/// - `…/attachments/<id>/` (вложения форума) → источник `beamngforum`,
+///   canonical attachment-URL;
+/// - остальное → источник `directurl` (обязателен `.zip`, SSRF-гейт).
+/// Всё до `download::start` — чистое (без сети): id/ключ/имя выводятся из
+/// текста ссылки. Сетевой этап (resolve + probe + скачивание) идёт через
+/// общий конвейер со стейджингом/лимитами/no-clobber.
+#[tauri::command]
+async fn install_from_url(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    url: String,
+) -> Result<String, String> {
+    let trimmed = url.trim().to_string();
+    if trimmed.is_empty() {
+        return Err(i18n::t("вставьте ссылку на мод", "paste a link to the mod"));
+    }
+    let (source, req) = if sources::beamngforum::looks_like_attachment(&trimmed) {
+        let canonical = sources::beamngforum::canonical_key(&trimmed).ok_or_else(|| {
+            i18n::t(
+                "не удалось распознать ссылку на вложение форума",
+                "could not recognize the forum attachment link",
+            )
+        })?;
+        let id = sources::beamngforum::attachment_id(&canonical)
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "0".to_string());
+        let req = InstallRequest {
+            source: "beamngforum".to_string(),
+            mod_id: id.clone(),
+            name: format!("attachment:{id}"),
+            key: canonical,
+            published: None,
+        };
+        ("beamngforum", req)
+    } else {
+        let (key, filename) =
+            sources::directurl::key_to_filename(&trimmed).map_err(|e| e.to_string())?;
+        let req = InstallRequest {
+            source: "directurl".to_string(),
+            mod_id: key.clone(),
+            name: filename.clone(),
+            key,
+            published: None,
+        };
+        ("directurl", req)
+    };
+
+    let mods_folder = {
+        let cfg = state.config.lock().map_err(|e| e.to_string())?;
+        require_source_enabled(&cfg, source)?;
+        cfg.mods_folder.clone().ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?
+    };
+    info!("установка по ссылке: {trimmed} → источник {source}");
+    download::start(
+        &app,
+        &state.client,
+        &state.downloads,
+        &state.cancels,
+        &mods_folder,
+        req,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Импорт локального .zip прямо в папку модов: staging `.part`, структурная
+/// проверка (те же лимиты, что у сетевых модов), no-clobber. В ledger НЕ
+/// пишется — происхождение файла всё равно локальное (как ручная установка).
+#[tauri::command]
+async fn import_local_zip(
+    state: State<'_, AppState>,
+    source_path: String,
+) -> Result<String, String> {
+    let src = PathBuf::from(&source_path);
+    let meta = tokio::fs::metadata(&src).await.map_err(|e| {
+        i18n::tf(
+            "не удалось открыть файл {0}: {1}",
+            "could not open the file {0}: {1}",
+            &[&source_path, &e.to_string()],
+        )
+    })?;
+    if !meta.is_file() {
+        return Err(i18n::t(
+            "указанный путь — не файл",
+            "the given path is not a file",
+        ));
+    }
+    let raw_name = src.file_name().map(|n| n.to_string_lossy().into_owned());
+    let raw_name = raw_name.as_deref().ok_or_else(|| {
+        i18n::t(
+            "не удалось получить имя файла",
+            "could not determine the file name",
+        )
+    })?;
+    if !raw_name.to_ascii_lowercase().ends_with(".zip") {
+        return Err(i18n::t(
+            "можно импортировать только .zip архивы",
+            "only .zip archives can be imported",
+        ));
+    }
+    let filename = crate::http::sanitize_filename(raw_name);
+
+    let mods_folder = state
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .mods_folder
+        .clone()
+        .ok_or_else(|| {
+            i18n::t(
+                "не выбрана папка с модами BeamNG",
+                "BeamNG mods folder is not selected",
+            )
+        })?;
+    let mods_dir = PathBuf::from(&mods_folder);
+    tokio::fs::create_dir_all(&mods_dir).await.map_err(|e| {
+        i18n::tf(
+            "не удалось создать {0}: {1}",
+            "failed to create {0}: {1}",
+            &[&mods_dir.display().to_string(), &e.to_string()],
+        )
+    })?;
+
+    let final_path = mods_dir.join(&filename);
+    if final_path.exists() {
+        return Err(i18n::tf(
+            "мод `{0}` уже установлен в папке модов. Удалите его там, чтобы переустановить.",
+            "the mod `{0}` is already installed in the mods folder. Remove it there to reinstall.",
+            &[&filename],
+        ));
+    }
+
+    let part_path = mods_dir.join(format!(".{filename}.import.part"));
+    let cleanup_part = |part: PathBuf| {
+        let _ = std::fs::remove_file(&part);
+    };
+    tokio::fs::copy(&src, &part_path).await.map_err(|e| {
+        cleanup_part(part_path.clone());
+        i18n::tf(
+            "не удалось скопировать архив: {0}",
+            "failed to copy the archive: {0}",
+            &[&e.to_string()],
+        )
+    })?;
+
+    let staged = part_path.clone();
+    let validated = tokio::task::spawn_blocking(move || archive::validate_zip(&staged))
+        .await
+        .map_err(|e| {
+            cleanup_part(part_path.clone());
+            i18n::tf(
+                "проверка архива прервана: {0}",
+                "archive check aborted: {0}",
+                &[&e.to_string()],
+            )
+        })?
+        .map_err(|e| {
+            cleanup_part(part_path.clone());
+            i18n::tf(
+                "архив не прошёл проверку: {0}",
+                "the archive did not pass the check: {0}",
+                &[&e.to_string()],
+            )
+        })?;
+    debug!(
+        "импорт: {} записей, ~{} байт распаковано",
+        validated.entries, validated.total_uncompressed
+    );
+
+    tokio::fs::rename(&part_path, &final_path)
+        .await
+        .map_err(|e| {
+            cleanup_part(part_path);
+            i18n::tf(
+                "не удалось переместить архив в папку модов: {0}",
+                "failed to move the archive into the mods folder: {0}",
+                &[&e.to_string()],
+            )
+        })?;
+    info!("импортирован локальный zip: {filename}");
+    Ok(filename)
+}
+
 #[tauri::command]
 fn cancel_download(state: State<'_, AppState>, key: String) -> Result<(), String> {
     download::cancel(&state.cancels, &key).map_err(|e| e.to_string())
@@ -717,6 +906,7 @@ pub fn run() {
                 .max_file_size(10 * 1024 * 1024)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let client = build_client()?;
             let cfg = Config::load();
@@ -751,6 +941,8 @@ pub fn run() {
             set_source_selected,
             reset_sources_to_defaults,
             install_mod,
+            install_from_url,
+            import_local_zip,
             get_downloads,
             cancel_download,
             update_mod,

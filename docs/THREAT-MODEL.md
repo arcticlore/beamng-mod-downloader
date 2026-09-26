@@ -1,6 +1,6 @@
 # Threat Model: BeamNG Mod Downloader
 
-Версия документа: 0.3.0-dev (PR sources: registry и выбор источников). Обновлять при
+Версия документа: 0.3.0-dev (PR sources: forum attachments + direct link + local import). Обновлять при
 каждом изменении, затрагивающем доверие, источники, сеть или файловую систему.
 
 ## 1. Ценность и поверхности
@@ -13,8 +13,9 @@ BeamNG.drive, ведёт реестр (ledger) установленного и �
 - backend (Rust): URL-построение, HTTP-клиент, ZIP-обработка, файловая система,
   ledger/config, единый **registry источников** и гейт enabled;
 - renderer (React/Tauri): UI, команды через IPC;
-- соответствие источников: WorldOfMods, официальный BeamNG resource site, GitHub
-  (в будущих PR — BeamNG Forum, GitLab, Codeberg, Nexus Mods, Beam-Monsters, 2Fast,
+- соответствие источников: WorldOfMods, официальный BeamNG resource site, GitHub,
+  BeamNG Forum (вложения по каноническому URL), прямая ссылка (allowlist-домены),
+  локальный импорт `.zip` (в будущих PR — GitLab, Codeberg, Nexus Mods, Beam-Monsters, 2Fast,
   пользовательские каталоги). Все id-источников и их метаданные живут в одном
   registry (Rust), фронтенд их не дублирует;
 - CI/CD и release pipeline: GitHub Actions, OBS, AUR.
@@ -41,6 +42,11 @@ Backend обязан валидировать **все** данные, прих�
 Защита: backend сам строит URL из source + canonical id; принимаемые URL
 проходят allowlist scheme/host + проверку после каждого redirect; запрещены
 localhost/loopback/link-local/private/reserved и URL-credentials; лимит redirects.
+**В этом PR**: команда `install_from_url` сама распознаёт форму ссылки
+(attachment-URL форума → канонический `…/attachments/<id>/`; иначе → источник
+`directurl`); `directurl::resolve_download` заново валидирует allowlist
+scheme/host (+ бонус: `%.html`-суффиксы в имени файла) перед скачиванием;
+письмо идёт через тот же allowlist-гейт после каждого redirect, что и T3.1.
 
 ### T3.2 HTML/JSON/EXE, переименованный в `.zip`
 Реален, т.к. Content-Type и расширение не являются гарантиями.
@@ -97,20 +103,35 @@ ledger отключённых источников. Если источник н
 с «неизвестный источник», без match-провала диспетчера. Неизвестные id в
 `enabled_sources`/`selected_sources` при загрузке конфига выбрасываются — конфиг
 не ломается, орфографические ошибки не «включают» несуществующий источник.
+**В этом PR**: `install_from_url` маршрутизирует ссылку на `beamngforum`/
+`directurl` и проверяет **этот** источник на enabled до начала сети;
+`import_local_zip` сеть не трогает (гейт не нужен), но принудительно проходит
+staging + структурную проверку zip + no-clobber и в ledger не пишется —
+происхождение файла местное (как ручная установка).
+
+### T3.10 Локальный импорт произвольного файла как `.zip`
+Атакующий/UI импортирует файл, который не является валидным архивом мода.
+
+Защита: путь приходит из системного диалога, но backend не доверяет ему —
+файл копируется в staging `.part`, проходит ту же структурную проверку zip
+(magic + central directory + лимиты записей и распакованного объёма + опасные
+пути), затем no-clobber-переименование в папку модов. Локальный источник не
+создаёт сетевых запросов, ledger не пишется.
 
 ## 4. Статус
 
 | id | Мера | Статус |
 | --- | ---- | ------ |
-| T3.1 | URL allowlist + revalidate на redirect'ах | затем: PR runtime-security |
-| T3.2 | ZIP magic + central directory + не-ZIP отклонение | затем: PR download-integrity |
-| T3.3 | лимиты entry/uncompressed | затем: PR download-integrity |
+| T3.1 | URL allowlist + revalidate на redirect'ах; directurl: форма ссылки → канон. URL | PR sources (этот) |
+| T3.2 | ZIP magic + central directory + не-ZIP отклонение | PR sources (этот): archive.rs |
+| T3.3 | лимиты entry count / uncompressed size (10 000 записей / 4 GiB) | PR sources (этот): archive.rs |
 | T3.4 | canonicalize + symlink-защита удаления | затем: PR filesystem |
 | T3.5 | ledger под Mutex + atomic write + schema | затем: PR ledger-config |
 | T3.6 | SHA-256 в ledger + unverified-статус | затем: PR download-integrity |
 | T3.7 | release/asset identity + честный update | затем: PR update-flow |
 | T3.8 | capabilities-минимум + CSP != null | затем: PR runtime-security |
 | T3.9 | enabled-гейт в backend-командах + санитизация конфига | PR sources (этот) |
+| T3.10 | локальный импорт: staging + zip-проверка + no-clobber, без ledger | PR sources (этот) |
 | — | CI: fmt/test/clippy/ts/build/audit/version/static | PR foundation (этот) |
 | — | CodeQL, пин Actions по SHA, release gate | PR foundation (этот) |
 

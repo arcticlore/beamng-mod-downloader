@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts tests/frontend/sources.test.ts tests/frontend/i18n.test.ts && vitest run tests/frontend/installed.test.tsx",
+    "test": "node --test --experimental-strip-types tests/frontend/types.test.ts tests/frontend/sources.test.ts tests/frontend/i18n.test.ts && vitest run tests/frontend/installed.test.tsx tests/frontend/linkimport.test.tsx",
     "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-log": "^2.9.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

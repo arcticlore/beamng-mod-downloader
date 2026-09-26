@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Основное окно: только локальные команды приложения (внутренний IPC), без shell/fs/http/process/opener",
+  "description": "Основное окно: только локальные команды приложения (внутренний IPC), файловый диалог открытия (ZIP-импорт), без shell/fs/http/process/opener",
   "windows": ["main"],
   "local": true,
   "permissions": [
     "core:default",
-    "log:default"
+    "log:default",
+    "dialog:allow-open"
   ]
 }

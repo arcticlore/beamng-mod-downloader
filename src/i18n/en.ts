@@ -222,6 +222,35 @@ export const en = {
   picker_manual_only: "Manual only",
   picker_configure: "Configure sources…",
 
+  link_import_open: "Add a mod",
+  link_import_title: "Add a mod from a link or file",
+  link_import_tab_url: "From a link",
+  link_import_tab_zip: "From a .zip file",
+  link_import_url_label: "Link to the mod archive",
+  link_import_url_placeholder:
+    "https://www.beamng.com/attachments/<id>/ — or a direct .zip link…",
+  link_import_kind_forum_hint:
+    "BeamNG Forum attachment — will install via the attachments/{id} pattern.",
+  link_import_kind_direct_hint: "Direct .zip archive link (http/https, allowed domains).",
+  link_import_forum_disabled:
+    "The “BeamNG forum” source is disabled in settings — attachments won't be installed.",
+  link_import_direct_disabled:
+    "The “Direct link” source is disabled in settings — direct links won't be installed.",
+  link_import_domains_hint:
+    "Direct links are allowed to: beamng.com, worldofmods.com, github.com, gitlab.com, codeberg.org. Anything else is blocked by the SSRF gate (install such mods manually — via your browser and file import).",
+  link_import_open_forum: "Open the forum in the browser",
+  link_import_url_bad: "Paste a link to the mod archive",
+  link_import_url_submit: "Install from the link",
+  link_import_started: "Install started: {url}",
+  link_import_zip_title: "Local archive import",
+  link_import_zip_pick: "Choose file…",
+  link_import_zip_none: "No file selected",
+  link_import_zip_chosen: "Selected: {file}",
+  link_import_zip_import: "Import into the mods folder",
+  link_import_zip_warning:
+    "The archive is copied into the mods folder after a structural check (zip limits: entries and uncompressed size). Content is not reviewed manually — import only trusted files.",
+  link_import_zip_imported: "Archive imported: {file}",
+
   close: "Close",
   rail_label: "Navigation",
   app_name: "BeamNG Mod Downloader",

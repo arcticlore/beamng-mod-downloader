@@ -46,6 +46,7 @@ fn caps(
     pagination: bool,
     detail: bool,
     direct: bool,
+    update_detection: bool,
 ) -> SourceCapabilities {
     SourceCapabilities {
         search,
@@ -55,7 +56,7 @@ fn caps(
         direct_zip_download: direct,
         manual_download: false,
         checksums: false,
-        update_detection: false,
+        update_detection,
     }
 }
 
@@ -76,7 +77,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
             filename_rule: FilenameRule::Basename,
-            capabilities: caps(true, true, true, true, true),
+            capabilities: caps(true, true, true, true, true, false),
             categories: crate::sources::beamngweb::categories(),
         },
         SourceDescriptor {
@@ -96,7 +97,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
             filename_rule: FilenameRule::OwnerRepo,
-            capabilities: caps(true, true, true, true, true),
+            capabilities: caps(true, true, true, true, true, false),
             categories: crate::sources::github::categories(),
         },
         SourceDescriptor {
@@ -113,7 +114,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
             filename_rule: FilenameRule::OwnerRepo,
-            capabilities: caps(true, true, true, true, true),
+            capabilities: caps(true, true, true, true, true, false),
             categories: crate::sources::gitlab::categories(),
         },
         SourceDescriptor {
@@ -130,7 +131,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
             filename_rule: FilenameRule::OwnerRepo,
-            capabilities: caps(true, true, true, true, true),
+            capabilities: caps(true, true, true, true, true, false),
             categories: crate::sources::codeberg::categories(),
         },
         SourceDescriptor {
@@ -154,7 +155,7 @@ pub fn registry() -> Vec<SourceDescriptor> {
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
             filename_rule: FilenameRule::HtmlSlug,
-            capabilities: caps(true, true, true, true, true),
+            capabilities: caps(true, true, true, true, true, false),
             categories: crate::sources::worldofmods::categories(),
         },
         SourceDescriptor {
@@ -167,19 +168,43 @@ pub fn registry() -> Vec<SourceDescriptor> {
             homepage: "https://www.beamng.com/community/".into(),
             terms_or_policy_url: Some("https://www.beamng.com/help/terms-of-service/".into()),
             warning: Some(crate::i18n::t(
-                "На форуме нет надёжного API поиска и привязки к zip-ассетам. \
-                 Найти мод и ссылку на файл придётся вручную — приложение только \
-                 подсказывает, куда смотреть, и не устанавливает контент автоматически.",
-                "The forum has no reliable search API or zip-asset links. \
-                 You will find the mod and download link manually — the app only \
-                 points where to look and does not install content automatically.",
+                "Поиск на форуме требует авторизации (вход в браузере). \
+                 Установка возможна по прямой ссылке вида .../attachments/<id>/: \
+                 приложение само скачает и проверит архив.",
+                "Forum search requires sign-in (log in in the browser). \
+                 Installation works from a direct .../attachments/<id>/ link: \
+                 the app downloads and verifies the archive on its own.",
             )),
-            install_mode: InstallMode::ManualExternal,
+            install_mode: InstallMode::ModsZip,
             auth: SourceAuth::None,
             status: SourceStatus::Ready,
-            filename_rule: FilenameRule::HtmlSlug,
-            capabilities: caps(false, false, false, false, false),
+            filename_rule: FilenameRule::Basename,
+            capabilities: caps(false, false, false, true, true, true),
             categories: crate::sources::beamngforum::categories(),
+        },
+        SourceDescriptor {
+            id: "directurl".into(),
+            label: crate::i18n::t("Прямая ссылка", "Direct link"),
+            group: SourceGroup::Custom,
+            trust_level: TrustLevel::Custom,
+            enabled_by_default: false,
+            legacy_default: false,
+            homepage: "https://www.beamng.com/resources/".into(),
+            terms_or_policy_url: None,
+            warning: Some(crate::i18n::t(
+                "Произвольный архив по прямой ссылке: файл не ревьюится BeamNG \
+                 и не проверяется вручную. Устанавливается только после структурной \
+                 проверки zip (размер, число записей, пути), но контент — на свой риск.",
+                "Arbitrary archive from a direct link: the file is not reviewed by BeamNG \
+                 and not checked manually. It is installed only after a structural zip check \
+                 (size, entry count, paths), but the content is at your own risk.",
+            )),
+            install_mode: InstallMode::ModsZip,
+            auth: SourceAuth::None,
+            status: SourceStatus::Ready,
+            filename_rule: FilenameRule::KeyStem,
+            capabilities: caps(false, false, false, true, true, true),
+            categories: crate::sources::directurl::categories(),
         },
     ];
     list.sort_by(|a, b| {
@@ -260,7 +285,7 @@ mod tests {
         // Миграция 0.2.x: ровно прежний набор — ничего лишнего.
         assert_eq!(legacy, ["beamngweb", "github", "worldofmods"]);
         // Источники, появившиеся после 0.2.x, не включаются автоматически.
-        for id in ["gitlab", "codeberg", "beamngforum"] {
+        for id in ["gitlab", "codeberg", "beamngforum", "directurl"] {
             assert!(
                 !new_cfg.iter().any(|e| e == id),
                 "новый конфиг не должен включать {id}"

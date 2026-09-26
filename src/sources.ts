@@ -250,3 +250,57 @@ export function dedupById(items: ModItem[]): ModItem[] {
   }
   return out;
 }
+
+/** Категория ссылки для панели «Добавить мод»: вложение форума или прямой .zip. */
+export type LinkKind = "forum" | "direct";
+
+/**
+ * Классифицирует вставленную ссылку по форме (те же правила, что у backend
+ * `beamngforum::canonical_key`): `attachment:<id>`, голые цифры и любые
+ * beamng.com-ссылки с путём `/attachments/<…><digits>` — вложение форума;
+ * всё остальное — прямой .zip (backend всё равно валидирует .zip + allowlist).
+ * Пустая строка — `null`.
+ */
+export function classifyLink(url: string): LinkKind | null {
+  const t = url.trim();
+  if (!t) return null;
+  if (/^attachment:\d+$/.test(t)) return "forum";
+  if (/^\d+$/.test(t)) return "forum";
+  let u: URL;
+  try {
+    u = new URL(t);
+  } catch {
+    return "direct";
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return "direct";
+  const host = u.hostname.toLowerCase();
+  if (host === "beamng.com" || host.endsWith(".beamng.com")) {
+    const segs = u.pathname.split("/").filter(Boolean);
+    if (
+      segs.length === 2 &&
+      segs[0] === "attachments" &&
+      /\d+$/.test(segs[1])
+    ) {
+      return "forum";
+    }
+  }
+  return "direct";
+}
+
+/** Канонический URL вложения: `…/attachments/<id>/` (для показа disabled-хинта). */
+export function forumIdFromLink(url: string): string | null {
+  const t = url.trim();
+  const m = t.match(/attachment:(\d+)/) ?? t.match(/^(\d+)$/);
+  if (m) return m[1];
+  try {
+    const u = new URL(t);
+    const segs = u.pathname.split("/").filter(Boolean);
+    if (segs.length === 2 && segs[0] === "attachments") {
+      const digits = (segs[1].match(/(\d+)$/) ?? [])[1];
+      return digits ?? null;
+    }
+  } catch {
+    /* пустая */
+  }
+  return null;
+}

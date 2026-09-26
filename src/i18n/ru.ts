@@ -223,6 +223,35 @@ export const ru = {
   picker_manual_only: "Только вручную",
   picker_configure: "Настроить источники…",
 
+  link_import_open: "Добавить мод",
+  link_import_title: "Добавить мод из ссылки или файла",
+  link_import_tab_url: "По ссылке",
+  link_import_tab_zip: "Из файла .zip",
+  link_import_url_label: "Ссылка на архив мода",
+  link_import_url_placeholder:
+    "https://www.beamng.com/attachments/<id>/ — или прямая ссылка на .zip…",
+  link_import_kind_forum_hint:
+    "Вложение BeamNG Forum — установится по шаблону attachments/{id}.",
+  link_import_kind_direct_hint: "Прямая ссылка на архив .zip (http/https, разрешённые домены).",
+  link_import_forum_disabled:
+    "Источник «Форум BeamNG» выключен в настройках — вложения не будут установлены.",
+  link_import_direct_disabled:
+    "Источник «Прямая ссылка» выключен в настройках — прямые ссылки не будут установлены.",
+  link_import_domains_hint:
+    "Прямые ссылки разрешены на: beamng.com, worldofmods.com, github.com, gitlab.com, codeberg.org. Прочее заблокирует SSRF-гейт (устанавливайте такие моды вручную — через браузер и импорт файла).",
+  link_import_open_forum: "Открыть форум в браузере",
+  link_import_url_bad: "Вставьте ссылку на архив мода",
+  link_import_url_submit: "Установить по ссылке",
+  link_import_started: "Установка началась: {url}",
+  link_import_zip_title: "Импорт локального архива",
+  link_import_zip_pick: "Выбрать файл…",
+  link_import_zip_none: "Файл не выбран",
+  link_import_zip_chosen: "Выбран: {file}",
+  link_import_zip_import: "Импортировать в папку модов",
+  link_import_zip_warning:
+    "Архив будет скопирован в папку модов после структурной проверки (лимиты zip: записей и распакованного объёма). Содержимое вручную не проверяется — импортируйте только доверенные файлы.",
+  link_import_zip_imported: "Архив импортирован: {file}",
+
   close: "Закрыть",
   rail_label: "Навигация",
   app_name: "BeamNG Mod Downloader",
