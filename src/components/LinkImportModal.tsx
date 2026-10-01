@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { importLocalZip, installFromUrl, openExternal } from "../api";
+import { importLocalZip, installFromUrl, openCommunity } from "../api";
 import { useSources } from "../SourcesContext";
 import { classifyLink } from "../sources";
 import { useI18n } from "../i18n/LanguageContext";
@@ -147,7 +147,7 @@ export function LinkImportModal({ variant, onToast, onClose }: Props) {
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => openExternal("https://www.beamng.com/community/")}
+              onClick={() => openCommunity()}
             >
               {t("link_import_open_forum")}
             </button>

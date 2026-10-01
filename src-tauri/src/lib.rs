@@ -86,45 +86,41 @@ fn set_mods_folder_force(state: State<'_, AppState>, path: String) -> Result<(),
     cfg.save().map_err(|e| e.to_string())
 }
 
-/// Открывает ссылку в системном браузере (автоматический переход на нужную
-/// страницу: вход в beamng.com, документация и т.п.).
-#[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err(i18n::t(
-            "разрешены только http/https ссылки",
-            "only http/https links are allowed",
-        ));
-    }
-    #[cfg(target_os = "linux")]
-    let opened = std::process::Command::new("xdg-open")
-        .arg(&url)
-        .spawn()
-        .and_then(|mut c| c.wait())
-        .is_ok();
-    #[cfg(target_os = "macos")]
-    let opened = std::process::Command::new("open")
-        .arg(&url)
-        .spawn()
-        .and_then(|mut c| c.wait())
-        .is_ok();
-    #[cfg(target_os = "windows")]
-    let opened = std::process::Command::new("cmd")
-        .args(["/C", "start", "", &url])
-        .spawn()
-        .and_then(|mut c| c.wait())
-        .is_ok();
+/// Единственный внешний URL, открываемый приложением, — страница сообщества
+/// (SEC-002). Ссылка захардкожена в команде: пользовательский ввод в команду
+/// не принимается вовсе, поэтому метасимволы оболочки (`&`, `|`, `^`, кавычки,
+/// переносы строк) не могут ни во что инъецироваться.
+const COMMUNITY_URL: &str = "https://www.beamng.com/community/";
 
+/// Открывает страницу сообщества в системном браузере без оболочки: команда
+/// запускается с отдельным argv (xdg-open/open/explorer — не cmd/sh/
+/// PowerShell), поэтому перепарсинг командной строки исключён.
+#[tauri::command]
+fn open_community() -> Result<(), String> {
+    let mut cmd = community_open_command();
+    let opened = cmd.spawn().and_then(|mut c| c.wait()).is_ok();
     if opened {
-        info!("открыта ссылка: {url}");
+        info!("открыта страница сообщества: {COMMUNITY_URL}");
         Ok(())
     } else {
-        error!("не удалось открыть ссылку: {url}");
+        error!("не удалось открыть страницу сообщества");
         Err(i18n::t(
             "не удалось открыть браузер",
             "could not open the browser",
         ))
     }
+}
+
+/// Строит команду открытия одобренного URL shell-free способом (CWE-78).
+fn community_open_command() -> std::process::Command {
+    #[cfg(target_os = "linux")]
+    let mut cmd = std::process::Command::new("xdg-open");
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer");
+    cmd.arg(COMMUNITY_URL);
+    cmd
 }
 
 #[tauri::command]
@@ -458,6 +454,14 @@ async fn import_local_zip(
             "the given path is not a file",
         ));
     }
+    // SEC-001: тот же лимит, что у скачивания, применяется к локальному импорту.
+    if meta.len() > crate::download::MAX_DOWNLOAD_BYTES {
+        return Err(i18n::tf(
+            "файл больше лимита {0} ГиБ — импорт отменён",
+            "the file exceeds the {0} GiB limit — import cancelled",
+            &[&(crate::download::MAX_DOWNLOAD_BYTES / (1024 * 1024 * 1024)).to_string()],
+        ));
+    }
     let raw_name = src.file_name().map(|n| n.to_string_lossy().into_owned());
     let raw_name = raw_name.as_deref().ok_or_else(|| {
         i18n::t(
@@ -507,14 +511,15 @@ async fn import_local_zip(
     let cleanup_part = |part: PathBuf| {
         let _ = std::fs::remove_file(&part);
     };
-    tokio::fs::copy(&src, &part_path).await.map_err(|e| {
-        cleanup_part(part_path.clone());
-        i18n::tf(
-            "не удалось скопировать архив: {0}",
-            "failed to copy the archive: {0}",
-            &[&e.to_string()],
-        )
-    })?;
+    crate::download::copy_limited(&src, &part_path, crate::download::MAX_DOWNLOAD_BYTES)
+        .await
+        .map_err(|e| {
+            i18n::tf(
+                "не удалось скопировать архив: {0}",
+                "failed to copy the archive: {0}",
+                &[&e],
+            )
+        })?;
 
     let staged = part_path.clone();
     let validated = tokio::task::spawn_blocking(move || archive::validate_zip(&staged))
@@ -931,7 +936,7 @@ pub fn run() {
             detect_mods_folders,
             set_mods_folder,
             set_mods_folder_force,
-            open_url,
+            open_community,
             search_mods,
             get_mod_detail,
             get_categories,
@@ -956,4 +961,58 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("ошибка запуска BeamNG Mod Downloader");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{community_open_command, COMMUNITY_URL};
+
+    #[test]
+    fn community_url_is_approved_https() {
+        let parsed = reqwest::Url::parse(COMMUNITY_URL).expect("approved URL должен парситься");
+        assert_eq!(parsed.scheme(), "https");
+        assert!(matches!(
+            parsed.host_str(),
+            Some("www.beamng.com" | "beamng.com")
+        ));
+        assert_eq!(parsed.path(), "/community/");
+        assert!(parsed.query().is_none() || parsed.query() == Some(""));
+    }
+
+    // SEC-002: команда обязана открывать URL без оболочки — отдельным argv.
+    #[test]
+    fn open_uses_shell_free_argv_no_user_input() {
+        let cmd = community_open_command();
+        assert!(
+            !matches!(
+                cmd.get_program().to_string_lossy().as_ref(),
+                "cmd" | "sh" | "bash" | "zsh" | "powershell" | "pwsh"
+            ),
+            "запуск через оболочку запрещён (CWE-78)"
+        );
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args, vec![COMMUNITY_URL.to_string()]);
+    }
+
+    // SEC-002: команда не принимает пользовательский ввод вовсе; любые строки
+    // (shell-метасимволы, чужие схемы и хосты) не могут стать argv. Инвариант
+    // проверяется на самой команде как закрытой функции.
+    #[test]
+    fn shell_metacharacters_cannot_reach_argv() {
+        let cmd = community_open_command();
+        let program = cmd.get_program().to_string_lossy().into_owned();
+        assert!(
+            ["xdg-open", "open", "explorer"].contains(&program.as_str()),
+            "ожидался системный opener, получен `{program}`"
+        );
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args, vec![COMMUNITY_URL.to_string()]);
+        assert!(COMMUNITY_URL.starts_with("https://"));
+    }
 }
