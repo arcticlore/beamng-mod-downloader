@@ -35,7 +35,7 @@ export const setModsFolder = (path: string, force = false) =>
 
 export const setModsFolderForce = (path: string) => call<void>("set_mods_folder_force", { path });
 
-export const openExternal = (url: string) => call<void>("open_url", { url });
+export const openCommunity = () => call<void>("open_community");
 
 export const searchMods = (
   source: string,
