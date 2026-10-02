@@ -514,6 +514,9 @@ async fn import_local_zip(
     crate::download::copy_limited(&src, &part_path, crate::download::MAX_DOWNLOAD_BYTES)
         .await
         .map_err(|e| {
+            // copy_limited уже закрыл хэндлы и снял dst; страховочная очистка
+            // `.part` на случай остатков на диске (SEC-001 cleanup).
+            cleanup_part(part_path.clone());
             i18n::tf(
                 "не удалось скопировать архив: {0}",
                 "failed to copy the archive: {0}",

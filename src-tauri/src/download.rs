@@ -236,9 +236,12 @@ async fn stream_to_part(
             )));
         }
         hasher.update(&chunk);
-        file.write_all(&chunk)
-            .await
-            .context(crate::i18n::t("ошибка записи на диск", "disk write error"))?;
+        if let Err(e) = file.write_all(&chunk).await {
+            drop(file);
+            cleanup_part(part).await;
+            return Err(anyhow::Error::new(e)
+                .context(crate::i18n::t("ошибка записи на диск", "disk write error")));
+        }
 
         let elapsed = window_start.elapsed().as_secs_f64().max(0.001);
         let speed = ((received - last_received) as f64 / elapsed).max(0.0) as u64;
@@ -265,7 +268,14 @@ async fn stream_to_part(
         );
     }
 
-    file.flush().await.ok();
+    if let Err(e) = file.flush().await {
+        drop(file);
+        cleanup_part(part).await;
+        return Err(anyhow::Error::new(e).context(crate::i18n::t(
+            "ошибка сброса буферов на диск",
+            "failed to flush to disk",
+        )));
+    }
     drop(file);
 
     let (hex, bytes) = (crate::archive::to_hex(&hasher.finalize()), received);
@@ -374,30 +384,59 @@ pub fn cancel(cancels: &CancelTable, key: &str) -> Result<()> {
     }
 }
 
-/// Копирует файл с лимитом байт (SEC-001): счётчик с checked-арифметикой,
-/// при превышении или любой ошибке целевой файл удаляется. Используется
-/// локальным импортом (та же граница, что у скачивания).
+/// Копирует файл с лимитом байт (SEC-001): счётчик с checked-арифметикой.
+/// Гарантия очистки: при любой ошибке (open/create/read/write/limit/flush)
+/// хэндлы сначала закрываются, затем `dst` принудительно удаляется — чтобы
+/// на диске не остался частичный `.part`. Используется локальным импортом
+/// (та же граница, что у скачивания).
 pub(crate) async fn copy_limited(src: &Path, dst: &Path, max_bytes: u64) -> Result<u64, String> {
-    let mut src_file = tokio::fs::File::open(src).await.map_err(|e| {
-        crate::i18n::tf(
-            "не удалось открыть {0}: {1}",
-            "could not open {0}: {1}",
-            &[&src.display().to_string(), &e.to_string()],
-        )
-    })?;
-    let mut dst_file = tokio::fs::File::create(dst).await.map_err(|e| {
-        let _ = std::fs::remove_file(dst);
-        crate::i18n::tf(
-            "не удалось создать {0}: {1}",
-            "failed to create {0}: {1}",
-            &[&dst.display().to_string(), &e.to_string()],
-        )
-    })?;
+    let mut src_file = match tokio::fs::File::open(src).await {
+        Ok(f) => f,
+        Err(e) => {
+            return Err(crate::i18n::tf(
+                "не удалось открыть {0}: {1}",
+                "could not open {0}: {1}",
+                &[&src.display().to_string(), &e.to_string()],
+            ));
+        }
+    };
+    let mut dst_file = match tokio::fs::File::create(dst).await {
+        Ok(f) => f,
+        Err(e) => {
+            drop(src_file);
+            let _ = std::fs::remove_file(dst);
+            return Err(crate::i18n::tf(
+                "не удалось создать {0}: {1}",
+                "failed to create {0}: {1}",
+                &[&dst.display().to_string(), &e.to_string()],
+            ));
+        }
+    };
+    let result = copy_limited_raw(&mut src_file, &mut dst_file, src, dst, max_bytes).await;
+    match result {
+        Ok(copied) => Ok(copied),
+        Err(e) => {
+            drop(src_file);
+            drop(dst_file);
+            let _ = std::fs::remove_file(dst);
+            Err(e)
+        }
+    }
+}
+
+/// Тело копирования без cleanup (очисткой занимается `copy_limited`, чтобы
+/// гарантия «закрыть хэндлы → удалить dst» была у всех ошибок единой).
+async fn copy_limited_raw(
+    src_file: &mut tokio::fs::File,
+    dst_file: &mut tokio::fs::File,
+    src: &Path,
+    dst: &Path,
+    max_bytes: u64,
+) -> Result<u64, String> {
     let mut buf = vec![0u8; 128 * 1024];
     let mut copied: u64 = 0;
     loop {
         let n = src_file.read(&mut buf).await.map_err(|e| {
-            let _ = std::fs::remove_file(dst);
             crate::i18n::tf(
                 "ошибка чтения {0}: {1}",
                 "read error {0}: {1}",
@@ -408,14 +447,12 @@ pub(crate) async fn copy_limited(src: &Path, dst: &Path, max_bytes: u64) -> Resu
             break;
         }
         copied = copied.checked_add(n as u64).ok_or_else(|| {
-            let _ = std::fs::remove_file(dst);
             crate::i18n::t(
                 "переполнение счётчика размера при импорте",
                 "size counter overflow during import",
             )
         })?;
         if exceeds_download_limit(copied, max_bytes) {
-            let _ = std::fs::remove_file(dst);
             return Err(crate::i18n::tf(
                 "файл больше лимита {0} ГиБ — импорт отменён",
                 "the file exceeds the {0} GiB limit — import cancelled",
@@ -423,7 +460,6 @@ pub(crate) async fn copy_limited(src: &Path, dst: &Path, max_bytes: u64) -> Resu
             ));
         }
         dst_file.write_all(&buf[..n]).await.map_err(|e| {
-            let _ = std::fs::remove_file(dst);
             crate::i18n::tf(
                 "ошибка записи {0}: {1}",
                 "write error {0}: {1}",
@@ -431,7 +467,13 @@ pub(crate) async fn copy_limited(src: &Path, dst: &Path, max_bytes: u64) -> Resu
             )
         })?;
     }
-    dst_file.flush().await.ok();
+    dst_file.flush().await.map_err(|e| {
+        crate::i18n::tf(
+            "ошибка записи {0}: {1}",
+            "write error {0}: {1}",
+            &[&dst.display().to_string(), &e.to_string()],
+        )
+    })?;
     Ok(copied)
 }
 
@@ -1095,6 +1137,44 @@ mod tests {
             "целевой файл обязан удаляться при превышении"
         );
         std::fs::remove_file(&src).ok();
+    }
+
+    /// Ошибка чтения/открытия src (каталог): единственная точка cleanup
+    /// `copy_limited` обязана снять dst. На Windows сбой происходит при open —
+    /// поведенческий инвариант тот же: Err + диска без лишнего файла.
+    #[tokio::test]
+    async fn copy_limited_read_error_closes_and_removes_destination() {
+        let src = tmp_part("rerr-src");
+        let dst = tmp_part("rerr-dst");
+        let _ = std::fs::remove_file(&dst);
+        std::fs::create_dir_all(&src).unwrap();
+        let err = copy_limited(&src, &dst, 1024)
+            .await
+            .expect_err("чтение каталога обязано завершиться ошибкой");
+        assert!(!err.is_empty());
+        assert!(!dst.exists(), "dst обязан удаляться при ошибке чтения");
+        std::fs::remove_dir_all(&src).ok();
+    }
+
+    /// Create-ошибка (dst — существующий каталог): remove-file не трогает
+    /// произвольные пути, которых мы не создавали.
+    #[tokio::test]
+    async fn copy_limited_create_error_leaves_uncreated_path_untouched() {
+        let src = tmp_part("cerr-src");
+        let dst = tmp_part("cerr-dst");
+        let _ = std::fs::remove_file(&src);
+        std::fs::write(&src, b"data").unwrap();
+        std::fs::create_dir_all(&dst).unwrap();
+        let err = copy_limited(&src, &dst, 1024)
+            .await
+            .expect_err("создание файла по пути каталога обязано падать");
+        assert!(!err.is_empty());
+        assert!(
+            dst.is_dir(),
+            "существующий каталог не удаляется (удаляем только созданный `.part`)"
+        );
+        std::fs::remove_file(&src).ok();
+        std::fs::remove_dir_all(&dst).ok();
     }
 
     #[test]
