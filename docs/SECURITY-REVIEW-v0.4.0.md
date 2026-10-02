@@ -52,7 +52,7 @@
 
 **Effort**: 1-2 часа
 **Priority**: Следующий релиз
-**Remediation Status**: **implemented** — единый `MAX_DOWNLOAD_BYTES = 8 GiB`; pre-check `Content-Length` до скачивания и счётчик фактических байт в `stream_to_part` (chunked/сжатие включены); `.part`-cleanup при превышении; `copy_limited` для `import_local_zip` с той же границей; ledger не меняется при ошибке. Fixed by commit: `2a8df0e` (PR #21, 2026-10-02).
+**Remediation Status**: **implemented** — единый `MAX_DOWNLOAD_BYTES = 8 GiB`; pre-check `Content-Length` до скачивания и счётчик фактических байт в `stream_to_part` (chunked/сжатие включены); `.part`-cleanup при превышении; `copy_limited` для `import_local_zip` с той же границей; ledger не меняется при ошибке. Fixed by PR #21 (2026-10-02).
 
 ---
 
@@ -75,7 +75,7 @@
 
 **Effort**: 15-30 минут
 **Priority**: Следующий релиз
-**Remediation Status**: **implemented** — `open_url` заменён на `open_community` (SEC-002): команда без аргументов, единственный захардкоженный одобренный URL; открытие без оболочки (`xdg-open`/`open`/`explorer`, отдельный argv, без cmd/sh/PowerShell); renderer-вызов `openCommunity()`; тесты инварианта argv. Fixed by commit: `2a8df0e` (PR #21, 2026-10-02).
+**Remediation Status**: **implemented** — `open_url` заменён на `open_community` (SEC-002): команда без аргументов, единственный захардкоженный одобренный URL; открытие без оболочки (`xdg-open`/`open`/`explorer`, отдельный argv, без cmd/sh/PowerShell); renderer-вызов `openCommunity()`; тесты инварианта argv. Fixed by PR #21 (2026-10-02).
 
 ---
 
