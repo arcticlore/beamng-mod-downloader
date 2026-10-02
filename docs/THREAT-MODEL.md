@@ -128,7 +128,7 @@ staging + структурную проверку zip + no-clobber и в ledger 
 | T3.2 | ZIP magic + central directory + не-ZIP отклонение | implemented (v0.4.0): archive.rs |
 | T3.3 | лимиты entry count / uncompressed size (10 000 записей / 4 GiB) | implemented (v0.4.0): archive.rs |
 | T3.4 | canonicalize + symlink-защита удаления | **partial**: только относительные пути без `..` в `remove_installed`; canonicalize/symlink-защита — open |
-| T3.5 | ledger под Mutex + atomic write + schema | **open**: Mutex есть; атомарная запись/схема — follow-up (SEC-004) |
+| T3.5 | ledger под Mutex + atomic write + schema | **open**: сериализации/мутекс ledger нет; атомарная запись, схема и синхронизация — follow-up (SEC-004) |
 | T3.6 | SHA-256 в ledger + unverified-статус | implemented (v0.4.0) |
 | T3.7 | release/asset identity + честный update | implemented (v0.4.0) |
 | T3.8 | capabilities-минимум + CSP != null | implemented (v0.4.0 + security PR: строгий CSP, capabilities `core:default`+`log:default`+`dialog:allow-open`, shell-free opener для одобренного community-URL) |
