@@ -20,17 +20,17 @@
   --md-shape-xl: 28px;
 }
 
-[data-theme="dark"][data-style="material"] html {
+html[data-theme="dark"][data-style="material"] {
   color-scheme: dark;
 }
 
-[data-theme="light"][data-style="material"] html {
+html[data-theme="light"][data-style="material"] {
   color-scheme: light;
 }
 
-[data-style="material"] html,
-[data-style="material"] body,
-[data-style="material"] #root {
+html[data-style="material"],
+html[data-style="material"] body,
+html[data-style="material"] #root {
   background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
 }
